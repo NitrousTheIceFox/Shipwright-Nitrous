@@ -813,6 +813,81 @@ namespace SohImGui {
                 ImGui::EndMenu();
             }
 
+            if (ImGui::BeginMenu("Nitrous' Tweaks"))
+            {
+                if (ImGui::BeginMenu("Graphics"))
+                {
+                    EnhancementCheckbox("HD Item Drops!", "nHDDrops");
+                    ImGui::EndMenu();
+                }
+
+                if (ImGui::BeginMenu("Cheats"))
+                {
+                    if (ImGui::BeginMenu("Elemental"))
+                    {
+                        EnhancementCheckbox("Nitrous' Blessing", "nNoFreeze");
+                        Tooltip("Prevents you from freezing. You'll still take damage from the freezing hit, though.");
+                        EnhancementCheckbox("Fireproof", "nNonFlammable");
+                        Tooltip("Link can't be set on fire by Fire Keese, etc.");
+                        EnhancementCheckbox("Voodoo Fire Walk (NOT IMPLEMENTED YET)", "nFireWalk");
+                        Tooltip("Lets you walk on burning floors, like Shadow Man when he gains his second of three Voodoo Gads.");
+                        EnhancementCheckbox("Heatproof (NOT IMPLEMENTED YET)", "nHeatproof");
+                        Tooltip("Stops the Heat Stroke / Hyperthermia Timer from popping up, and also makes you one step closer to being Twilight Princess Link.");
+                        ImGui::Separator();
+                        ImGui::Text("May Require room / map reload.");
+
+                        ImGui::EndMenu();
+                    }
+                    ImGui::EndMenu();
+                }
+                if (ImGui::BeginMenu("Difficulty"))
+                {
+                    EnhancementCheckbox("Longer Fire (NOT IMPLEMENTED YET)", "nDifficultyFireLonger");
+                    Tooltip("Makes being on fire last longer without Goron Tunic. Better move and roll!");
+                    EnhancementCheckbox("Faster burn damage (NOT IMPLEMENTED YET)", "nDifficultyFireFaster");
+                    Tooltip("Being on fire drains your health faster.");
+                    ImGui::Separator();
+                    ImGui::Text("May Require room / map reload.");
+                    ImGui::EndMenu();
+                }
+
+                if (ImGui::BeginMenu("Enemy Options"))
+                {
+                    if (ImGui::BeginMenu("Like Like"))
+                    {
+                        //ImGui::Text("Like Like:");
+                        ImGui::Text("Difficulty:");
+                        EnhancementCheckbox("Button Mash", "nLikeLikeMash");
+                        Tooltip("If this is turned on, you NEED to mash to escape.");
+                        EnhancementSliderInt("Like Like Spawn Health (Default: 4): %d", "##LikeLikeHP", "nLikeLikeHealth", 1, 100, "");
+                        EnhancementCheckbox("Like Like Munch Damage", "nLikeLikeDamage");
+                        Tooltip("If this is turned on, Like Like's damage you constantly when they've eaten you. Makes the vanilla mash to escape sooner more of a use, and the Like Likes MUCH more of a threat.");
+
+                        ImGui::Text("Size (Requires Room Reload, and affects some size / distance-reliant things!):");
+                        EnhancementRadioButton("Hyrule Like Like", "nLikeLikeSizeMode", 0);
+                        Tooltip("Vanilla OoT Size.");
+                        EnhancementRadioButton("Great Bay Like Like", "nLikeLikeSizeMode", 1);
+                        Tooltip("Close to the Majora's Mask Giant Like Likes in Great Bay. (2.5x size roughly!)");
+
+                        //Can't seem to get it working, for now.
+                        //EnhancementRadioButton("Custom Scale", "nLikeLikeSizeMode", 2);
+                        //EnhancementSliderFloat("Custom X-Size: %d %%", "##LikeLikeCustomXSize", "nLikeLikeCustomXScale", 0.0f, 0.030f, "", 0.014f, true);
+                        //EnhancementSliderFloat("Custom Y-Size: %d %%", "##LikeLikeCustomYSize", "nLikeLikeCustomYScale", 0.0f, 0.030f, "", 0.013f, true); 
+                        //EnhancementSliderFloat("Custom Z-Size: %d %%", "##LikeLikeCustomZSize", "nLikeLikeCustomZScale", 0.0f, 0.030f, "", 0.014f, true);
+                        //EnhancementSliderFloat("Custom Equal Size: %d %%", "##LikeLikeCustomESize", "nLikeLikeCustomEScale", 0.0f, 0.030f, "", 0.014f, true);
+
+                        EnhancementCheckbox("Equal Proportions", "nLikeLikeSizeFix");
+                        Tooltip("Default scales are 0.013f and 0.014f, which slightly bothered my OCD. This effects all options when enabled and sets all scale dimensions to the larger scale (0.014f in Vanilla size).");
+
+                        ImGui::EndMenu();
+                    }
+                    ImGui::Separator();
+                    ImGui::Text("Some Enemy Options require room reload.");
+                    ImGui::EndMenu();
+                }
+                ImGui::EndMenu();
+            }
+
             if (ImGui::BeginMenu("Developer Tools"))
             {
                 EnhancementCheckbox("OoT Debug Mode", "gDebugEnabled");

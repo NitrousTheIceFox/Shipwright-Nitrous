@@ -1,7 +1,10 @@
-#include "z_boss_dodongo.h"
+﻿#include "z_boss_dodongo.h"
 #include "objects/object_kingdodongo/object_kingdodongo.h"
 #include "overlays/actors/ovl_Door_Warp1/z_door_warp1.h"
 #include "scenes/dungeons/ddan_boss/ddan_boss_room_1.h"
+
+#define RR_MESSAGE_SHIELD (1 << 0)
+#define RR_MESSAGE_TUNIC (1 << 1)
 
 #define FLAGS (ACTOR_FLAG_0 | ACTOR_FLAG_2 | ACTOR_FLAG_4 | ACTOR_FLAG_5)
 
@@ -32,6 +35,20 @@ f32 func_808C4F6C(BossDodongo* this, GlobalContext* globalCtx);
 f32 func_808C50A8(BossDodongo* this, GlobalContext* globalCtx);
 void BossDodongo_DrawEffects(GlobalContext* globalCtx);
 void BossDodongo_UpdateEffects(GlobalContext* globalCtx);
+
+
+u8 EnDodongo_GetMessage(u8 shield, u8 tunic) {
+    u8 messageIndex = 0;
+
+    if ((shield == 1 /* Deku shield */) || (shield == 2 /* Hylian shield */)) {
+        messageIndex = RR_MESSAGE_SHIELD;
+    }
+    if ((tunic == 2 /* Goron tunic */) || (tunic == 3 /* Zora tunic */)) {
+        messageIndex |= RR_MESSAGE_TUNIC;
+    }
+
+    return messageIndex;
+}
 
 const ActorInit Boss_Dodongo_InitVars = {
     ACTOR_EN_DODONGO,
@@ -162,14 +179,55 @@ void func_808C17C8(GlobalContext* globalCtx, Vec3f* arg1, Vec3f* arg2, Vec3f* ar
     }
 }
 
-s32 BossDodongo_AteExplosive(BossDodongo* this, GlobalContext* globalCtx) {
+void BossDodongo_SetupInhale(BossDodongo* this, GlobalContext* globalCtx) {
+    this->actor.speedXZ = 0.0f;
+    Animation_Change(&this->skelAnime, &object_kingdodongo_Anim_008EEC, 1.0f, 0.0f,
+                     Animation_GetLastFrame(&object_kingdodongo_Anim_008EEC), ANIMMODE_ONCE, -5.0f);
+    //If Link isn't swallowed, release him from King Dodongo's jaws, otherwise, Link will be spat out with the fire.
+    if ((this->grab != 0) && (this->spittingout != 0)) {
+        this->hasPlayer = false;
+        this->grabTimer = 0;
+        this->ocTimer = 110;
+        
+        Player* player = GET_PLAYER(globalCtx);
+
+        player->actor.shape.rot.x = 0; //Set Link's rotation to default.
+        player->actor.world.pos = this-> mouthPos;
+        this->grab = 0;
+        this->spittingout = 0;
+        this->stoploop = 0;
+        this->stoppingloop = 0;
+    }
+    this->actionFunc = BossDodongo_Inhale;
+    this->unk_1DA = 100;
+    this->unk_1AC = 0;
+    this->unk_1E2 = 1;
+}
+
+//NEW BITE ANIMATION
+/* void BossDodongo_Bite(BossDodongo* this, GlobalContext* globalCtx) {
+    while (this->bitingPlayer == 1) {
+        Animation_Change(&this->skelAnime, &object_kingdodongo_Anim_008EEC, 1.0f, 0.0f,
+                         Animation_GetLastFrame(&object_kingdodongo_Anim_008EEC), ANIMMODE_ONCE, -5.0f);
+    }
+} */
+
+s32 BossDodongo_AteExplosive(BossDodongo* this, GlobalContext* globalCtx)
+{
+    Player* player = GET_PLAYER(globalCtx);
+
     f32 dx;
     f32 dy;
     f32 dz;
+    f32 dx2;
+    f32 dy2;
+    f32 dz2;
     Actor* currentExplosive = globalCtx->actorCtx.actorLists[ACTORCAT_EXPLOSIVE].head;
+    Actor* currentLink = globalCtx->actorCtx.actorLists[ACTORCAT_PLAYER].head;
     Actor* thisx = &this->actor;
 
     while (currentExplosive != NULL) {
+        this->LinkNotBomb = 0;
         if (currentExplosive == thisx) {
             currentExplosive = currentExplosive->next;
             continue;
@@ -185,6 +243,80 @@ s32 BossDodongo_AteExplosive(BossDodongo* this, GlobalContext* globalCtx) {
         }
 
         currentExplosive = currentExplosive->next;
+    }
+
+    while (currentLink != NULL) 
+    {
+            dx2 = currentLink->world.pos.x - this->mouthPos.x;
+            dy2 = currentLink->world.pos.y - this->mouthPos.y;
+            dz2 = currentLink->world.pos.z - this->mouthPos.z;
+
+        if ((fabsf(dx2) < 80.0f) && (fabsf(dy2) < 80.0f) && (fabsf(dz2) < 80.0f) && (player->invincibilityTimer == 0)) {
+                
+                this->grab=1;
+                // "catch"
+                // osSyncPrintf(VT_FGCOL(GREEN) "キャッチ(%d)！！" VT_RST "\n", this->frameCount);
+                if (this->LinkSwallowed == 0) {
+                    if ((this->grab==1) && (this->spittingout == 0) && (this->hasPlayer==false)) {
+                            if (globalCtx->grabPlayer(globalCtx, player)) {
+                                player->actor.parent = &this->actor;
+                                player->actor.world.pos.x = this->mouthPos.x;
+                                player->actor.world.pos.y = this->mouthPos.y + 20;
+                                player->actor.world.pos.z = this->mouthPos.z;
+                                player->actor.shape.rot.x = -15000;
+                                player->actor.shape.rot.y = this->actor.world.rot.y - 15000;
+                            }
+                    }
+                }
+                else if (this->LinkSwallowed == 1) {
+                    if ((this->grab == 1) && (this->spittingout == 0)) {
+                        if (globalCtx->grabPlayer(globalCtx, player)) {
+                            player->actor.parent = &this->actor;
+                            player->actor.world.pos.x = this->mouthPos.x;
+                            player->actor.world.pos.y = this->mouthPos.y + 70;
+                            player->actor.world.pos.z = this->mouthPos.z;
+                            player->actor.shape.rot.x = -15000;
+                            player->actor.shape.rot.y = this->actor.world.rot.y - 15000;
+                        }
+                    }
+                }
+
+            func_800AA000(this->actor.xyzDistToPlayerSq, 120, 2, 120);
+
+            if ((this->frameCount == 16) && (this->playerBelly == 0) && (this->grab = 1))
+            {
+                Audio_PlayActorSound2(&this->actor, NA_SE_EN_DODO_K_DOWN);
+                Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_EAT);
+                this->frameCount = 0;
+            }
+            if ((this->frameCount == 16) && (this->playerBelly == 1) && (this->grab = 1))
+            {
+                    Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_EAT);
+                    if (this->frameCount > 64) {
+
+                        Audio_PlayActorSound2(&this->actor, NA_SE_EN_DODO_K_DOWN);
+                        this->frameCount = 0;
+                    }
+                    
+            }
+            
+            if (((this->grabTimer == 0 ) && (this->stoploop == 0) || (!(player->stateFlags2 & 0x80))) && (this->hasPlayer = true)) {
+                //this->LinkSwallowed == 1;
+                this->ocTimer = 8;
+                BossDodongo_SetupInhale(this, globalCtx);
+                if (this->stoppingloop = 1) {
+                    this->stoploop = 1;
+                }
+            } /*else {
+                Math_ApproachF(&player->actor.world.pos.x, this->mouthPos.x, 1.0f, 30.0f);
+                Math_ApproachF(&player->actor.world.pos.y, this->mouthPos.y + this->swallowOffset, 1.0f, 30.0f);
+                Math_ApproachF(&player->actor.world.pos.z, this->mouthPos.z, 1.0f, 30.0f);
+
+                Math_ApproachF(&this->swallowOffset, -137.5f, 1.0f, 12.5f);
+            } */
+        }
+        
+        currentLink = currentLink->next;
     }
 
     return false;
@@ -206,7 +338,11 @@ void BossDodongo_Init(Actor* thisx, GlobalContext* globalCtx) {
     Animation_PlayLoop(&this->skelAnime, &object_kingdodongo_Anim_00F0D8);
     this->unk_1F8 = 1.0f;
     BossDodongo_SetupIntroCutscene(this, globalCtx);
-    this->health = 12;
+    this->health = 4; //default 4
+    this->grabTimer = 0;
+    this->invincibilityTimer = 0;
+    this->bitingPlayer = 1;
+    this->ocTimer = 0;
     this->colorFilterMin = 995.0f;
     this->actor.colChkInfo.mass = MASS_IMMOVABLE;
     this->colorFilterMax = 1000.0f;
@@ -476,7 +612,14 @@ void BossDodongo_SetupDamaged(BossDodongo* this) {
 void BossDodongo_SetupExplode(BossDodongo* this) {
     Animation_Change(&this->skelAnime, &object_kingdodongo_Anim_00E848, 1.0f, 0.0f,
                      Animation_GetLastFrame(&object_kingdodongo_Anim_00E848), ANIMMODE_ONCE, -5.0f);
-    this->actionFunc = BossDodongo_Explode;
+
+    if (this->LinkNotBomb == 0) {
+        this->actionFunc = BossDodongo_Explode;
+    } else if (this->LinkNotBomb == 1) {
+        this->ocTimer = 8;
+        this->hasPlayer = true;
+        this->actionFunc = BossDodongo_Walk;
+    }
     this->unk_1B0 = 10;
     this->unk_1C0 = 2;
     this->unk_1DA = 35;
@@ -502,6 +645,7 @@ void BossDodongo_SetupRoll(BossDodongo* this) {
 }
 
 void BossDodongo_SetupBlowFire(BossDodongo* this) {
+    this->ocTimer = 8;
     this->actor.speedXZ = 0.0f;
     this->unk_1E4 = 0.0f;
     Animation_Change(&this->skelAnime, &object_kingdodongo_Anim_0061D4, 1.0f, 0.0f,
@@ -509,16 +653,6 @@ void BossDodongo_SetupBlowFire(BossDodongo* this) {
     this->actionFunc = BossDodongo_BlowFire;
     this->unk_1DA = 50;
     this->unk_1AE = 0;
-}
-
-void BossDodongo_SetupInhale(BossDodongo* this) {
-    this->actor.speedXZ = 0.0f;
-    Animation_Change(&this->skelAnime, &object_kingdodongo_Anim_008EEC, 1.0f, 0.0f,
-                     Animation_GetLastFrame(&object_kingdodongo_Anim_008EEC), ANIMMODE_ONCE, -5.0f);
-    this->actionFunc = BossDodongo_Inhale;
-    this->unk_1DA = 100;
-    this->unk_1AC = 0;
-    this->unk_1E2 = 1;
 }
 
 void BossDodongo_Damaged(BossDodongo* this, GlobalContext* globalCtx) {
@@ -619,6 +753,7 @@ void BossDodongo_BlowFire(BossDodongo* this, GlobalContext* globalCtx) {
 
     if (Animation_OnFrame(&this->skelAnime, 12.0f)) {
         Audio_PlayActorSound2(&this->actor, NA_SE_EN_DODO_K_CRY);
+        
     }
 
     if (Animation_OnFrame(&this->skelAnime, 17.0f)) {
@@ -627,8 +762,62 @@ void BossDodongo_BlowFire(BossDodongo* this, GlobalContext* globalCtx) {
 
     if ((this->skelAnime.curFrame > 17.0f) && (this->skelAnime.curFrame < 35.0f)) {
         BossDodongo_SpawnFire(this, globalCtx, this->unk_1AE);
+
+        if (this->hasPlayer == true) {
+
+            // Spit Link Out!
+
+            Player* player = GET_PLAYER(globalCtx);
+            u8 shield;
+            u8 tunic;
+
+            this->LinkNotBomb == 0;
+            this->actor.flags |= ACTOR_FLAG_0;
+            this->hasPlayer = false;
+            player->actor.parent = NULL;
+            this->grabTimer = 0;
+            this->ocTimer = 110;
+
+            player->actor.shape.rot.x = 0; // Set Link's rotation to default.
+            player->actor.world.pos = this->mouthPos;
+            this->grab = 0;
+            this->spittingout = 0;
+            this->stoploop = 0;
+            this->stoppingloop = 0;
+            this->LinkSwallowed = 0;
+            this->bitingPlayer = 0;
+
+            tunic = 0;
+            shield = 0;
+            if (CUR_EQUIP_VALUE(EQUIP_SHIELD) != 3 /* Mirror shield */) {
+                shield = Inventory_DeleteEquipment(globalCtx, EQUIP_SHIELD);
+                if (shield != 0) {
+                    this->eatenShield = shield;
+                }
+            }
+            if (CUR_EQUIP_VALUE(EQUIP_TUNIC) != 1 /* Kokiri tunic */) {
+                tunic = Inventory_DeleteEquipment(globalCtx, EQUIP_TUNIC);
+                if (tunic != 0) {
+                    this->eatenTunic = tunic;
+                }
+            }
+            player->actor.parent = NULL;
+            switch (EnDodongo_GetMessage(shield, tunic)) {
+                case RR_MESSAGE_SHIELD:
+                    Message_StartTextbox(globalCtx, 0x305F, NULL);
+                    break;
+                case RR_MESSAGE_TUNIC:
+                    Message_StartTextbox(globalCtx, 0x3060, NULL);
+                    break;
+                case RR_MESSAGE_TUNIC | RR_MESSAGE_SHIELD:
+                    Message_StartTextbox(globalCtx, 0x3061, NULL);
+                    break;
+            }
+        }
+
         this->unk_1AE++;
         Math_SmoothStepToF(&this->unk_244, 0.0f, 1.0f, 8.0f, 0.0f);
+        this->LinkSwallowed == 0;
     }
 
     if (this->unk_1DA == 0) {
@@ -638,24 +827,64 @@ void BossDodongo_BlowFire(BossDodongo* this, GlobalContext* globalCtx) {
 
 void BossDodongo_Inhale(BossDodongo* this, GlobalContext* GlobalContext) {
     this->unk_1E2 = 1;
+    Player* player = GET_PLAYER(GlobalContext);
 
-    if (this->unk_1AC > 20) {
-        Audio_PlayActorSound2(&this->actor, NA_SE_EN_DODO_K_BREATH - SFX_FLAG);
-    }
-
-    Math_SmoothStepToF(&this->unk_208, 0.05f, 1.0f, 0.005f, 0.0f);
-    SkelAnime_Update(&this->skelAnime);
-
-    if (this->unk_1DA == 0) {
-        BossDodongo_SetupBlowFire(this);
-    } else {
-        this->unk_1AC++;
-
-        if ((this->unk_1AC > 20) && (this->unk_1AC < 82) && BossDodongo_AteExplosive(this, GlobalContext)) {
-            Audio_PlayActorSound2(&this->actor, NA_SE_EN_DODO_K_DRINK);
-            BossDodongo_SetupExplode(this);
+    /*if (this->grab == 1) {
+        if (this->LinkSwallowed == 0) {
+            if ((this->grab = 1) && (this->spittingout == 0)) {
+                if (GlobalContext->grabPlayer(GlobalContext, player)) {
+                    player->actor.parent = &this->actor;
+                    player->actor.world.pos.x = this->mouthPos.x;
+                    player->actor.world.pos.y = this->mouthPos.y + 20;
+                    player->actor.world.pos.z = this->mouthPos.z;
+                    player->actor.shape.rot.x = -15000;
+                    player->actor.shape.rot.y = this->actor.world.rot.y - 15000;
+                }
+            }
+        } else if (this->LinkSwallowed == 1) {
+            if ((this->grab = 1) && (this->spittingout == 0)) {
+                if (GlobalContext->grabPlayer(GlobalContext, player)) {
+                    player->actor.parent = &this->actor;
+                    player->actor.world.pos.x = this->mouthPos.x;
+                    player->actor.world.pos.y = this->mouthPos.y + 70;
+                    player->actor.world.pos.z = this->mouthPos.z;
+                    player->actor.shape.rot.x = -15000;
+                    player->actor.shape.rot.y = this->actor.world.rot.y - 15000;
+                }
+            } else if ((this->grab = 1) && (this->spittingout == 1)) {
+                if (GlobalContext->grabPlayer(GlobalContext, player)) {
+                    player->actor.parent = &this->actor;
+                    player->actor.world.pos.x = this->mouthPos.x;
+                    player->actor.world.pos.y = this->mouthPos.y + 70;
+                    player->actor.world.pos.z = this->mouthPos.z;
+                    player->actor.shape.rot.x = -15000;
+                    player->actor.shape.rot.y = this->actor.world.rot.y - 15000;
+                }
+            }
         }
-    }
+    } */
+
+        if (this->unk_1AC > 20) {
+            Audio_PlayActorSound2(&this->actor, NA_SE_EN_DODO_K_BREATH - SFX_FLAG);
+        }
+
+        Math_SmoothStepToF(&this->unk_208, 0.05f, 1.0f, 0.005f, 0.0f);
+        SkelAnime_Update(&this->skelAnime);
+
+        if (this->unk_1DA == 0) {
+            BossDodongo_SetupBlowFire(this);
+        } else {
+            this->unk_1AC++;
+
+            if ((this->unk_1AC > 20) && (this->unk_1AC < 82))
+            {
+                if (BossDodongo_AteExplosive(this, GlobalContext)) 
+                {
+                    Audio_PlayActorSound2(&this->actor, NA_SE_EN_DODO_K_DRINK);
+                    BossDodongo_SetupExplode(this);
+                }
+            }
+        }
 }
 
 static Vec3f sCornerPositions[] = {
@@ -670,73 +899,79 @@ void BossDodongo_Walk(BossDodongo* this, GlobalContext* globalCtx) {
     f32 sp48;
     f32 sp44;
 
-    if (this->unk_1AA == 0) {
-        if (Animation_OnFrame(&this->skelAnime, 14.0f)) {
-            Animation_PlayLoop(&this->skelAnime, &object_kingdodongo_Anim_01CAE0);
-            this->unk_1AA = 1;
+        if (this->unk_1AA == 0) {
+            if (Animation_OnFrame(&this->skelAnime, 14.0f)) {
+                Animation_PlayLoop(&this->skelAnime, &object_kingdodongo_Anim_01CAE0);
+                this->unk_1AA = 1;
+            }
+        } else if (this->unk_1BC != 2) {
+            if (((s32)this->skelAnime.curFrame == 1) || ((s32)this->skelAnime.curFrame == 31)) {
+                if ((s32)this->skelAnime.curFrame == 1) {
+                    Actor_SpawnFloorDustRing(globalCtx, &this->actor, &this->unk_410, 25.0f, 0xA, 8.0f, 0x1F4, 0xA, 0);
+                } else {
+                    Actor_SpawnFloorDustRing(globalCtx, &this->actor, &this->unk_404, 25.0f, 0xA, 8.0f, 0x1F4, 0xA, 0);
+                }
+
+                if (this->unk_1BC != 0) {
+                    func_80078884(NA_SE_EN_DODO_K_WALK);
+                } else {
+                    Audio_PlayActorSound2(&this->actor, NA_SE_EN_DODO_K_WALK);
+                }
+
+                if (this->cutsceneCamera == 0) {
+                    func_80033E88(&this->actor, globalCtx, 4, 10);
+                } else {
+                    this->unk_1B6 = 10;
+                    func_800A9F6C(0.0f, 180, 20, 100);
+                }
+            }
         }
-    } else if (this->unk_1BC != 2) {
-        if (((s32)this->skelAnime.curFrame == 1) || ((s32)this->skelAnime.curFrame == 31)) {
-            if ((s32)this->skelAnime.curFrame == 1) {
-                Actor_SpawnFloorDustRing(globalCtx, &this->actor, &this->unk_410, 25.0f, 0xA, 8.0f, 0x1F4, 0xA, 0);
+
+        SkelAnime_Update(&this->skelAnime);
+        sp4C = &sCornerPositions[this->unk_1A0];
+        this->unk_1EC = 0.7f;
+        Math_SmoothStepToF(&this->unk_1E4, this->unk_1EC * 4.0f, 1.0f, this->unk_1EC * 0.25f, 0.0f);
+        Math_SmoothStepToF(&this->actor.world.pos.x, sp4C->x, 0.3f, this->unk_1E4, 0.0f);
+        Math_SmoothStepToF(&this->actor.world.pos.z, sp4C->z, 0.3f, this->unk_1E4, 0.0f);
+        sp48 = sp4C->x - this->actor.world.pos.x;
+        sp44 = sp4C->z - this->actor.world.pos.z;
+        Math_SmoothStepToF(&this->unk_1E8, 2000.0f, 1.0f, this->unk_1EC * 80.0f, 0.0f);
+        Math_SmoothStepToS(&this->actor.world.rot.y, Math_FAtan2F(sp48, sp44) * (0x8000 / M_PI), 5,
+                           (this->unk_1EC * this->unk_1E8), 5);
+        Math_SmoothStepToS(&this->unk_1C4, 0, 2, 2000, 0);
+
+        if ((fabsf(sp48) <= 5.0f) && (fabsf(sp44) <= 5.0f)) {
+            this->unk_1E8 = 0.0f;
+            this->unk_1E4 = 0.0f;
+            if (this->unk_1A2 == 0) {
+                this->unk_1A0++;
+                if (this->unk_1A0 >= 4) {
+                    this->unk_1A0 = 0;
+                }
             } else {
-                Actor_SpawnFloorDustRing(globalCtx, &this->actor, &this->unk_404, 25.0f, 0xA, 8.0f, 0x1F4, 0xA, 0);
-            }
-
-            if (this->unk_1BC != 0) {
-                func_80078884(NA_SE_EN_DODO_K_WALK);
-            } else {
-                Audio_PlayActorSound2(&this->actor, NA_SE_EN_DODO_K_WALK);
-            }
-
-            if (this->cutsceneCamera == 0) {
-                func_80033E88(&this->actor, globalCtx, 4, 10);
-            } else {
-                this->unk_1B6 = 10;
-                func_800A9F6C(0.0f, 180, 20, 100);
+                this->unk_1A0--;
+                if (this->unk_1A0 < 0) {
+                    this->unk_1A0 = 3;
+                }
             }
         }
-    }
+        if (this->grab == 0) {
+            if ((this->unk_1DA == 0) && (this->unk_1BC == 0)) {
+                if ((this->actor.xzDistToPlayer < 500.0f) && (this->unk_1A4 != 0) && !this->playerPosInRange) {
+                    BossDodongo_SetupInhale(this, globalCtx);
+                    BossDodongo_SpawnFire(this, globalCtx, -1);
+                }
 
-    SkelAnime_Update(&this->skelAnime);
-    sp4C = &sCornerPositions[this->unk_1A0];
-    this->unk_1EC = 0.7f;
-    Math_SmoothStepToF(&this->unk_1E4, this->unk_1EC * 4.0f, 1.0f, this->unk_1EC * 0.25f, 0.0f);
-    Math_SmoothStepToF(&this->actor.world.pos.x, sp4C->x, 0.3f, this->unk_1E4, 0.0f);
-    Math_SmoothStepToF(&this->actor.world.pos.z, sp4C->z, 0.3f, this->unk_1E4, 0.0f);
-    sp48 = sp4C->x - this->actor.world.pos.x;
-    sp44 = sp4C->z - this->actor.world.pos.z;
-    Math_SmoothStepToF(&this->unk_1E8, 2000.0f, 1.0f, this->unk_1EC * 80.0f, 0.0f);
-    Math_SmoothStepToS(&this->actor.world.rot.y, Math_FAtan2F(sp48, sp44) * (0x8000 / M_PI), 5,
-                       (this->unk_1EC * this->unk_1E8), 5);
-    Math_SmoothStepToS(&this->unk_1C4, 0, 2, 2000, 0);
-
-    if ((fabsf(sp48) <= 5.0f) && (fabsf(sp44) <= 5.0f)) {
-        this->unk_1E8 = 0.0f;
-        this->unk_1E4 = 0.0f;
-        if (this->unk_1A2 == 0) {
-            this->unk_1A0++;
-            if (this->unk_1A0 >= 4) {
-                this->unk_1A0 = 0;
+                if (!this->playerPosInRange && !this->playerYawInRange) {
+                    BossDodongo_SetupRoll(this);
+                }
             }
-        } else {
-            this->unk_1A0--;
-            if (this->unk_1A0 < 0) {
-                this->unk_1A0 = 3;
+        } else if (this->grab == 1) {
+            if (this->bitingPlayer == 1) {
+                Animation_Change(&this->skelAnime, &object_kingdodongo_Anim_008EEC, 1.0f, 0.0f,
+                                 Animation_GetLastFrame(&object_kingdodongo_Anim_008EEC), ANIMMODE_ONCE, -5.0f);
             }
         }
-    }
-
-    if ((this->unk_1DA == 0) && (this->unk_1BC == 0)) {
-        if ((this->actor.xzDistToPlayer < 500.0f) && (this->unk_1A4 != 0) && !this->playerPosInRange) {
-            BossDodongo_SetupInhale(this);
-            BossDodongo_SpawnFire(this, globalCtx, -1);
-        }
-
-        if (!this->playerPosInRange && !this->playerYawInRange) {
-            BossDodongo_SetupRoll(this);
-        }
-    }
 }
 
 void BossDodongo_Roll(BossDodongo* this, GlobalContext* globalCtx) {
@@ -835,6 +1070,52 @@ void BossDodongo_Update(Actor* thisx, GlobalContext* globalCtx2) {
     Player* player2 = GET_PLAYER(globalCtx);
     s32 pad;
 
+    this->frameCount++;
+
+    //if (this->hasPlayer != 0) {
+
+        //if ((this->bitingPlayer) = 1) {
+            //func_800AA000(this->actor.xyzDistToPlayerSq, 120, 2, 120);
+            //player->actor.parent = &this->actor;
+
+            //player->actor.world.pos = this->mouthPos;
+        //}
+    //}
+
+        this->frameCount++;
+        if (this->grabTimer != 0) {
+            // If Hard Mode is NOT off...
+            if (CVar_GetS32("nLikeLikeMash", 0) != 0) {
+                if (CVar_GetS32("nLikeLikeDamage", 0) != 0) {
+                    Player_InflictDamage(globalCtx, -1);
+                    if (this->MunchTimer == 16) {
+                        Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_DRINK);
+                        this->MunchTimer = 0;
+                    }
+                    this->MunchTimer++;
+                }
+                // Damage Function goes here
+            } else {
+                if (CVar_GetS32("nLikeLikeDamage", 0) != 0) {
+                    Player_InflictDamage(globalCtx, -1);
+                    if (this->MunchTimer == 16) {
+                        Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_DRINK);
+                        this->MunchTimer++;
+                    }
+                    this->grabTimer--;
+                }
+            }
+        }
+        if (this->ocTimer != 0) {
+            this->ocTimer--;
+        }
+
+        if (this->hasPlayer == 0x3F80) // checks if 1.0f has been stored to hasPlayer's address
+        {
+            ASSERT(0, "0", "../z_boss_dodongo.c", 1355);
+        }
+    //}
+
     this->unk_1E2 = 0;
     this->unk_19E++;
 
@@ -872,6 +1153,14 @@ void BossDodongo_Update(Actor* thisx, GlobalContext* globalCtx2) {
         this->unk_1A6 = temp_f0;
     } else {
         this->unk_1A6 = 0;
+    }
+
+    if (this->hasPlayer==true) {
+        player->actor.world.pos.x = this->mouthPos.x;
+        player->actor.world.pos.y = this->mouthPos.y + 20;
+        player->actor.world.pos.z = this->mouthPos.z;
+        player->actor.shape.rot.x = -15000;
+        player->actor.shape.rot.y = this->actor.world.rot.y - 15000;
     }
 
     BossDodongo_PlayerYawCheck(this, globalCtx);
@@ -1611,6 +1900,30 @@ void BossDodongo_DeathCutscene(BossDodongo* this, GlobalContext* globalCtx) {
 
             if (this->unk_1DA == 820) {
                 Audio_QueueSeqCmd(SEQ_PLAYER_BGM_MAIN << 24 | NA_BGM_BOSS_CLEAR);
+
+                //DROP SHIELD
+
+                switch (this->eatenShield) {
+                    case 1:
+                        Actor_Spawn(&globalCtx->actorCtx, globalCtx, ITEM00_SHIELD_DEKU,
+                                    Math_SinS(this->actor.shape.rot.y) * -50.0f + this->actor.world.pos.x,
+                                    this->actor.world.pos.y,
+                                    Math_CosS(this->actor.shape.rot.y) * -50.0f + this->actor.world.pos.z, 0, 0, 0, 0);
+                        break;
+                    case 2:
+                        Actor_Spawn(&globalCtx->actorCtx, globalCtx, ITEM00_SHIELD_HYLIAN,
+                                    Math_SinS(this->actor.shape.rot.y) * -50.0f + this->actor.world.pos.x,
+                                    this->actor.world.pos.y,
+                                    Math_CosS(this->actor.shape.rot.y) * -50.0f + this->actor.world.pos.z, 0, 0, 0, 0);
+                        break;
+                    case 3:
+                        Actor_Spawn(&globalCtx->actorCtx, globalCtx, ITEM_SHIELD_MIRROR,
+                                    Math_SinS(this->actor.shape.rot.y) * -50.0f + this->actor.world.pos.x,
+                                    this->actor.world.pos.y,
+                                    Math_CosS(this->actor.shape.rot.y) * -50.0f + this->actor.world.pos.z, 0, 0, 0, 0);
+                        break;
+                }
+
                 Actor_Spawn(&globalCtx->actorCtx, globalCtx, ACTOR_ITEM_B_HEART,
                             Math_SinS(this->actor.shape.rot.y) * -50.0f + this->actor.world.pos.x,
                             this->actor.world.pos.y,
