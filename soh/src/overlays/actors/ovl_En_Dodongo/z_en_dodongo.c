@@ -707,7 +707,7 @@ void EnDodongo_SweepTail(EnDodongo* this, GlobalContext* globalCtx) {
     }
 }
 
-u8 EnRr_GetMessage(u8 shield, u8 tunic) {
+u8 EnDodongo_GetMessage(u8 shield, u8 tunic) {
     u8 messageIndex = 0;
 
     if ((shield == 1 /* Deku shield */) || (shield == 2 /* Hylian shield */)) {
@@ -982,6 +982,9 @@ void EnRrStyle_SetupReleasePlayer(EnDodongo* this, GlobalContext* globalCtx) {
     this->ocTimer = 110;
     this->grabTimer = 0;
     this->lettinggo = 0;
+    tunic = 0;
+    shield = 0;
+
     player->actor.parent = NULL; //unparent of course
     switch (EnDodongo_GetMessage(shield, tunic)) {
         case RR_MESSAGE_SHIELD:

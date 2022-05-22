@@ -37,7 +37,7 @@ void BossDodongo_DrawEffects(GlobalContext* globalCtx);
 void BossDodongo_UpdateEffects(GlobalContext* globalCtx);
 
 
-u8 EnDodongo_GetMessage(u8 shield, u8 tunic) {
+u8 EnKingDodongo_GetMessage(u8 shield, u8 tunic) {
     u8 messageIndex = 0;
 
     if ((shield == 1 /* Deku shield */) || (shield == 2 /* Hylian shield */)) {
@@ -802,7 +802,7 @@ void BossDodongo_BlowFire(BossDodongo* this, GlobalContext* globalCtx) {
                 }
             }
             player->actor.parent = NULL;
-            switch (EnDodongo_GetMessage(shield, tunic)) {
+            switch (EnKingDodongo_GetMessage(shield, tunic)) {
                 case RR_MESSAGE_SHIELD:
                     Message_StartTextbox(globalCtx, 0x305F, NULL);
                     break;

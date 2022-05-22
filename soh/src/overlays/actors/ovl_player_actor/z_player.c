@@ -3564,15 +3564,17 @@ void func_80837C0C(GlobalContext* globalCtx, Player* this, s32 arg2, f32 arg3, f
     func_80837AE0(this, arg6);
 
     if (arg2 == 3) {
-        func_80835C58(globalCtx, this, func_8084FB10, 0);
+        if (CVar_GetS32("nNoFreeze", 0) == 0) {
+            func_80835C58(globalCtx, this, func_8084FB10, 0);
 
-        sp2C = &gPlayerAnim_002FD0;
+            sp2C = &gPlayerAnim_002FD0;
 
-        func_80832224(this);
-        func_8083264C(this, 255, 10, 40, 0);
+            func_80832224(this);
+            func_8083264C(this, 255, 10, 40, 0);
 
-        func_8002F7DC(&this->actor, NA_SE_PL_FREEZE_S);
-        func_80832698(this, NA_SE_VO_LI_FREEZE);
+            func_8002F7DC(&this->actor, NA_SE_PL_FREEZE_S);
+            func_80832698(this, NA_SE_VO_LI_FREEZE);
+        }
     }
     else if (arg2 == 4) {
         func_80835C58(globalCtx, this, func_8084FBF4, 0);
@@ -3894,8 +3896,8 @@ s32 func_808382DC(Player* this, GlobalContext* globalCtx) {
                     ((sp48 >= 0) &&
                         SurfaceType_IsWallDamage(&globalCtx->colCtx, this->actor.floorPoly, this->actor.floorBgId) &&
                         (this->unk_A79 >= D_808544F4[sp48])) ||
-                    ((sp48 >= 0) &&
-                        ((this->currentTunic != PLAYER_TUNIC_GORON && CVar_GetS32("gSuperTunic", 0) == 0) || (this->unk_A79 >= D_808544F4[sp48])))) {
+                    ((sp48 >= 0) && ((this->currentTunic != PLAYER_TUNIC_GORON && CVar_GetS32("gSuperTunic", 0) == 0) ||
+                                     CVar_GetS32("nNonFlammable", 0) || (this->unk_A79 >= D_808544F4[sp48])))) {
                     this->unk_A79 = 0;
                     this->actor.colChkInfo.damage = 4;
                     func_80837C0C(globalCtx, this, 0, 4.0f, 5.0f, this->actor.shape.rot.y, 20);
@@ -10245,6 +10247,11 @@ void func_80848C74(GlobalContext* globalCtx, Player* this) {
 
     if (this->currentTunic == PLAYER_TUNIC_GORON || CVar_GetS32("gSuperTunic", 0) != 0) {
         sp54 = 20;
+    }
+    else if (CVar_GetS32("nNonFlammable", 0) != 0) {
+        sp54 = 0;
+        dmgCooldown = 10;
+        this->isBurning = false;
     }
     else {
         sp54 = (s32)(this->linearVelocity * 0.4f) + 1;
