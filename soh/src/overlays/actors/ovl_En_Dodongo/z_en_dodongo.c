@@ -3,7 +3,13 @@
 #include "overlays/actors/ovl_En_Bombf/z_en_bombf.h"
 #include "objects/object_dodongo/object_dodongo.h"
 
-#define FLAGS (ACTOR_FLAG_0 | ACTOR_FLAG_2 | ACTOR_FLAG_4)
+#define FLAGS (ACTOR_FLAG_0 | ACTOR_FLAG_2 | ACTOR_FLAG_4 )
+
+#define RR_MESSAGE_SHIELD (1 << 0)
+#define RR_MESSAGE_TUNIC (1 << 1)
+
+u8 shield;
+u8 tunic;
 
 typedef enum {
     DODONGO_SWEEP_TAIL,
@@ -16,6 +22,10 @@ typedef enum {
     DODONGO_STUNNED,
     DODONGO_WALK
 } EnDodongoActionState;
+
+void EnRrStyle_GrabPlayer(EnDodongo* this, GlobalContext* globalCtx);
+void EnRrStyle_SetupGrabPlayer(EnDodongo* this, Player* player);
+void EnRrStyle_SetupReleasePlayer(EnDodongo* this, GlobalContext* globalCtx);
 
 void EnDodongo_Init(Actor* thisx, GlobalContext* globalCtx);
 void EnDodongo_Destroy(Actor* thisx, GlobalContext* globalCtx);
@@ -200,6 +210,26 @@ static ColliderQuadInit sAttackQuadInit = {
     { { { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } } },
 };
 
+//william
+static ColliderCylinderInitType1 sCylinderInit2 = {
+    {
+        COLTYPE_NONE,
+        AT_NONE,
+        AC_ON | AC_HARD | AC_TYPE_PLAYER,
+        OC1_ON | OC1_NO_PUSH | OC1_TYPE_PLAYER,
+        COLSHAPE_CYLINDER,
+    },
+    {
+        ELEMTYPE_UNK0,
+        { 0xFFCFFFFF, 0x00, 0x08 },
+        { 0xFFCFFFFF, 0x00, 0x00 },
+        TOUCH_ON | TOUCH_SFX_NORMAL,
+        BUMP_ON,
+        OCELEM_ON,
+    },
+    { 20, 20, -10, { 0, 0, 0 } },
+};
+
 static DamageTable sDamageTable = {
     /* Deku nut      */ DMG_ENTRY(0, 0x1),
     /* Deku stick    */ DMG_ENTRY(2, 0x0),
@@ -306,9 +336,14 @@ static InitChainEntry sInitChain[] = {
 };
 
 void EnDodongo_Init(Actor* thisx, GlobalContext* globalCtx) {
+
     EnDodongo* this = (EnDodongo*)thisx;
     EffectBlureInit1 blureInit;
 
+    //Nitrous
+    this->SpitLock = 0;
+    this->lettinggo = 0;
+    //
     this->actor.targetMode = 3;
     Actor_ProcessInitChain(&this->actor, sInitChain);
     this->bombSmokePrimColor.r = this->bombSmokePrimColor.g = this->bombSmokeEnvColor.r = 255;
@@ -316,12 +351,19 @@ void EnDodongo_Init(Actor* thisx, GlobalContext* globalCtx) {
     this->bombSmokeEnvColor.g = 10;
     this->bodyScale.x = this->bodyScale.y = this->bodyScale.z = 1.0f;
     ActorShape_Init(&this->actor.shape, 0.0f, ActorShadow_DrawCircle, 48.0f);
-    Actor_SetScale(&this->actor, 0.01875f);
+    Actor_SetScale(&this->actor, 0.01875f); //Actor_SetScale(&this->actor, 0.01875f);
     SkelAnime_Init(globalCtx, &this->skelAnime, &gDodongoSkel, &gDodongoWaitAnim, this->jointTable, this->morphTable,
                    31);
     this->actor.colChkInfo.health = 4;
     this->actor.colChkInfo.mass = MASS_HEAVY;
     this->actor.colChkInfo.damageTable = &sDamageTable;
+
+    //William ////////////////////////////////////////
+    this->grabTimer = 0;
+    Collider_InitCylinder(globalCtx, &this->collider2);
+    Collider_SetCylinderType1(globalCtx, &this->collider2, &this->actor, &sCylinderInit2);
+    ///////////////////////////////////////////////////
+
     Collider_InitQuad(globalCtx, &this->colliderAT);
     Collider_InitTris(globalCtx, &this->colliderHard);
     Collider_InitJntSph(globalCtx, &this->colliderBody);
@@ -353,6 +395,8 @@ void EnDodongo_Destroy(Actor* thisx, GlobalContext* globalCtx) {
     Collider_DestroyTris(globalCtx, &this->colliderHard);
     Collider_DestroyJntSph(globalCtx, &this->colliderBody);
     Collider_DestroyQuad(globalCtx, &this->colliderAT);
+    //william
+    Collider_DestroyCylinder(globalCtx, &this->collider2); //////
 }
 
 void EnDodongo_SetupIdle(EnDodongo* this) {
@@ -375,6 +419,7 @@ void EnDodongo_SetupWalk(EnDodongo* this) {
 }
 
 void EnDodongo_SetupBreatheFire(EnDodongo* this) {
+    this->isBreathing = true; //STARBURST I put this here
     Animation_MorphToPlayOnce(&this->skelAnime, &gDodongoBreatheFireAnim, -4.0f);
     this->actionState = DODONGO_BREATHE_FIRE;
     this->actor.speedXZ = 0.0f;
@@ -382,6 +427,7 @@ void EnDodongo_SetupBreatheFire(EnDodongo* this) {
 }
 
 void EnDodongo_SetupEndBreatheFire(EnDodongo* this) {
+    this->isBreathing = false;
     Animation_PlayOnce(&this->skelAnime, &gDodongoAfterBreatheFireAnim);
     this->actionState = DODONGO_END_BREATHE_FIRE;
     this->actor.speedXZ = 0.0f;
@@ -431,6 +477,9 @@ void EnDodongo_BreatheFire(EnDodongo* this, GlobalContext* globalCtx) {
 
     if ((s32)this->skelAnime.curFrame == 24) {
         Audio_PlayActorSound2(&this->actor, NA_SE_EN_DODO_J_CRY);
+        if (this->lettinggo == 1) {
+            EnRrStyle_SetupReleasePlayer;
+        }
     }
     if ((29.0f <= this->skelAnime.curFrame) && (this->skelAnime.curFrame <= 43.0f)) {
         Audio_PlayActorSound2(&this->actor, NA_SE_EN_DODO_J_FIRE - SFX_FLAG);
@@ -658,7 +707,21 @@ void EnDodongo_SweepTail(EnDodongo* this, GlobalContext* globalCtx) {
     }
 }
 
+u8 EnRr_GetMessage(u8 shield, u8 tunic) {
+    u8 messageIndex = 0;
+
+    if ((shield == 1 /* Deku shield */) || (shield == 2 /* Hylian shield */)) {
+        messageIndex = RR_MESSAGE_SHIELD;
+    }
+    if ((tunic == 2 /* Goron tunic */) || (tunic == 3 /* Zora tunic */)) {
+        messageIndex |= RR_MESSAGE_TUNIC;
+    }
+
+    return messageIndex;
+}
+
 void EnDodongo_SetupDeath(EnDodongo* this, GlobalContext* globalCtx) {
+    this->isDead = true; //ADDED
     Animation_MorphToPlayOnce(&this->skelAnime, &gDodongoDieAnim, -8.0f);
     this->timer = 0;
     Audio_PlayActorSound2(&this->actor, NA_SE_EN_DODO_J_DEAD);
@@ -762,11 +825,230 @@ void EnDodongo_UpdateQuad(EnDodongo* this, GlobalContext* globalCtx) {
                              &this->colliderAT.dim.quad[c], &this->colliderAT.dim.quad[d]);
 }
 
+//STARBURST
+void EnRrStyle_CollisionCheck(EnDodongo* this, GlobalContext* globalCtx) {
+    Vec3f hitPos;
+    Player* player = GET_PLAYER(globalCtx);
+
+    //This is if the collider is hit by an attack i think.
+    //This is most likely unnecessary, but i tried to follow the like like code
+    if (this->collider2.base.acFlags & AC_HIT) {
+        this->collider2.base.acFlags &= ~AC_HIT;
+    
+        hitPos.x = this->collider2.info.bumper.hitPos.x;
+        hitPos.y = this->collider2.info.bumper.hitPos.y;
+        hitPos.z = this->collider2.info.bumper.hitPos.z;
+
+        CollisionCheck_SpawnShieldParticlesMetal2(globalCtx, &hitPos);
+    } 
+    else {
+        //If the suck collider collides with link under the right conditions, we move on to setting up the grab
+        if ((this->ocTimer == 0) && (this->lettinggo==false) && (this->actor.colorFilterTimer == 0) && (player->invincibilityTimer == 0) &&
+            !(player->stateFlags2 & 0x80) &&
+            (this->collider2.base.ocFlags1 & OC1_HIT)) {
+            this->collider2.base.ocFlags1 &= ~OC1_HIT;
+            // "catch"
+            if (globalCtx->grabPlayer(globalCtx, player)) { //As you know this sets link as grabbed
+                player->actor.parent = &this->actor; //and ya gotta parent him of course
+                EnRrStyle_SetupGrabPlayer(this, player); //now we move on to setupd
+            }
+        }
+    }
+}
+
+void EnRrStyle_SetupGrabPlayer(EnDodongo* this, Player* player) {
+    s32 i;
+
+    this->grabTimer = 100;
+    //this->actor.flags &= ~ACTOR_FLAG_0;
+    this->ocTimer = 8;
+    this->hasPlayer = true;
+    this->reachState = 0;
+
+    //All of this stuff sets up the wiggle animation of the like like, but it is unnecessary for the dodongo
+    //--------------------------------------------
+    //
+    /*this->segMoveRate = this->swallowOffset = this->actor.speedXZ = 0.0f;
+    this->pulseSizeTarget = 0.15f;
+    this->segPhaseVelTarget = 5000.0f;
+    this->wobbleSizeTarget = 512.0f;
+    for (i = 0; i < 5; i++) {
+        this->bodySegs[i].heightTarget = 0.0f;
+        this->bodySegs[i].rotTarget.x = this->bodySegs[i].rotTarget.z = 0.0f;
+        this->bodySegs[i].scaleTarget.x = this->bodySegs[i].scaleTarget.z = 1.0f;
+    }*/
+    //--------------------------------------------
+
+
+    //Once you set this action function, all the animations of the dodongo will freeze
+    //To fix this the way that nintendo probably would is to interrupt this animation with a new one of him swallowing and then spitting him out.
+    //youd want to put this animation inside the next action function: EnRrStyle_GrabPlayer
+    this->actionFunc = EnRrStyle_GrabPlayer;
+    Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_DRINK);
+}
+
+void EnRrStyle_GrabPlayer(EnDodongo* this, GlobalContext* globalCtx) {
+    Player* player = GET_PLAYER(globalCtx);
+
+    Vec3f smokeVel = { 0.0f, 0.0f, 0.0f };
+    Vec3f smokeAccel = { 0.0f, 0.6f, 0.0f };
+    Color_RGBA8 white = { 255, 255, 255, 255 };
+    Vec3f deathFireVel = { 0.0f, 0.0f, 0.0f };
+    Vec3f deathFireAccel = { 0.0f, 1.0f, 0.0f };
+    s16 i;
+    Vec3f pos;
+    s32 pad;
+
+    //Tbh idek what this does exactly and was too lazy to figure it out. It probably moves the player smoothly or something
+    func_800AA000(this->actor.xyzDistToPlayerSq, 120, 2, 120);
+
+    //For every 8 frames, play sound
+    //This would break if we were playing the game at a higher frame rate I think
+    if ((this->hasPlayer == true) && (this->lettinggo == 0)) {
+        if ((this->frameCount % 8) == 0) {
+            Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_EAT);
+        }
+    }
+    this->ocTimer = 8;
+
+    //If its been the timer amoutn of time, release the player of course
+    if (((this->grabTimer < 2) && (this->grabTimer > 0)) || !(player->stateFlags2 & 0x80) && (this->SpitLock == 0)) {
+        this->lettinggo = 1;
+        if (this->hasPlayer == true) {
+            EnRrStyle_SetupReleasePlayer(this, globalCtx);
+        }
+    }
+    //Otherwise we're going to move link to the mouth position of course
+    else {
+        Math_ApproachF(&player->actor.world.pos.x, this->actor.world.pos.x, 1.0f, 30.0f);
+        Math_ApproachF(&player->actor.world.pos.y, this->actor.world.pos.y+20, 1.0f, 30.0f);
+        Math_ApproachF(&player->actor.world.pos.z, this->actor.world.pos.z, 1.0f, 30.0f);
+        //Math_ApproachF(&this->swallowOffset, -55.0f, 1.0f, 5.0f);
+    }
+
+    if ((s32)this->skelAnime.curFrame == 28) {
+        Audio_PlayActorSound2(&this->actor, NA_SE_EN_DODO_J_EAT);
+    } else if ((s32)this->skelAnime.curFrame == 24) {
+        this->timer--;
+        if (this->timer != 0) {
+            this->skelAnime.curFrame++;
+            if (this->timer == 10) {
+                for (i = 10; i >= 0; i--) {
+                    deathFireVel.x = Rand_CenteredFloat(10.0f);
+                    deathFireVel.y = Rand_CenteredFloat(10.0f);
+                    deathFireVel.z = Rand_CenteredFloat(10.0f);
+                    deathFireAccel.x = deathFireVel.x * -0.1f;
+                    deathFireAccel.y = deathFireVel.y * -0.1f;
+                    deathFireAccel.z = deathFireVel.z * -0.1f;
+                    pos.x = this->sphElements[0].dim.worldSphere.center.x + deathFireVel.x;
+                    pos.y = this->sphElements[0].dim.worldSphere.center.y + deathFireVel.y;
+                    pos.z = this->sphElements[0].dim.worldSphere.center.z + deathFireVel.z;
+                    func_8002836C(globalCtx, &pos, &deathFireVel, &deathFireAccel, &this->bombSmokePrimColor,
+                                  &this->bombSmokeEnvColor, 400, 10, 10);
+                }
+                Audio_PlayActorSound2(&this->actor, NA_SE_EN_DODO_J_EAT);
+                //Actor_SetColorFilter(&this->actor, 0x4000, 0x78, 0, 8);
+            }
+        }
+    }
+    if ((s32)this->skelAnime.curFrame < 28) {
+        if (((s32)this->skelAnime.curFrame < 26) && (this->timer <= 10)) {
+            EnDodongo_SpawnBombSmoke(this, globalCtx);
+        } else {
+            pos = this->headPos;
+            func_8002829C(globalCtx, &pos, &smokeVel, &smokeAccel, &white, &white, 50, 5);
+            pos.x -= (Math_CosS(this->actor.shape.rot.y) * 6.0f);
+            pos.z += (Math_SinS(this->actor.shape.rot.y) * 6.0f);
+            func_8002829C(globalCtx, &pos, &smokeVel, &smokeAccel, &white, &white, 50, 5);
+            pos.x = this->headPos.x + (Math_CosS(this->actor.shape.rot.y) * 6.0f);
+            pos.z = this->headPos.z - (Math_SinS(this->actor.shape.rot.y) * 6.0f);
+            func_8002829C(globalCtx, &pos, &smokeVel, &smokeAccel, &white, &white, 50, 5);
+        }
+    }
+    this->bodyScale.y = this->bodyScale.z = (Math_SinS(this->actor.colorFilterTimer * 0x1000) * 0.5f) + 1.0f;
+    this->bodyScale.x = Math_SinS(this->actor.colorFilterTimer * 0x1000) + 1.0f;
+
+    SkelAnime_Update(&this->skelAnime);
+    if (this->timer == 0) {
+        EnDodongo_SetupDeath(this, globalCtx);
+    }
+}
+
+void EnRrStyle_SetupReleasePlayer(EnDodongo* this, GlobalContext* globalCtx) {
+    //Yay release player
+    Player* player = GET_PLAYER(globalCtx);
+
+    this->hasPlayer = false;
+    this->ocTimer = 110;
+    this->grabTimer = 0;
+    this->lettinggo = 0;
+    player->actor.parent = NULL; //unparent of course
+    switch (EnDodongo_GetMessage(shield, tunic)) {
+        case RR_MESSAGE_SHIELD:
+            Message_StartTextbox(globalCtx, 0x305F, NULL);
+            break;
+        case RR_MESSAGE_TUNIC:
+            Message_StartTextbox(globalCtx, 0x3060, NULL);
+            break;
+        case RR_MESSAGE_TUNIC | RR_MESSAGE_SHIELD:
+            Message_StartTextbox(globalCtx, 0x3061, NULL);
+            break;
+    }
+    //Love when nintendo makes a function that literally only calls another function when they could just call the other function in the first place.
+    func_8002F6D4(globalCtx, &this->actor, 4.0f, this->actor.shape.rot.y, 12.0f, 8);
+    if (this->actor.colorFilterTimer == 0) {
+        this->actionFunc = EnDodongo_EndBreatheFire;
+        Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_THROW);
+    }
+    //Damage? what damage? I've never heard of damage in my life.
+    /* else if (this->actor.colChkInfo.health != 0) {
+        EnRr_SetupDamage(this);
+    } else {
+        EnRr_SetupDeath(this);
+    }*/
+}
+
+void EnRrStyle_Swallow(Actor* thisx, GlobalContext* globalCtx) {
+    EnDodongo* this = (EnDodongo*)thisx;
+    if (!this->isBreathing)
+        return;
+
+
+    //IF THE DODONGO IS NOT DEAD
+    //AND
+    //IF COLOR FILTER TIMER IS 0 OR COLOR FILTER PARAMETERS IS 16384
+    if (!this->isDead && ((this->actor.colorFilterTimer == 0) || !(this->actor.colorFilterParams & 0x4000))) {
+        EnRrStyle_CollisionCheck(this, globalCtx); //This checks if link is by his mouth
+    }
+
+    //These change the sucking colliders position to be at his mouth. You can offset this to move the collider.
+    this->collider2.dim.pos.x = this->mouthPos.x;
+    this->collider2.dim.pos.y = this->mouthPos.y;
+    this->collider2.dim.pos.z = this->mouthPos.z;
+
+    //If he's not dead then set those colliders
+    if (!this->isDead) {
+        CollisionCheck_SetAC(globalCtx, &globalCtx->colChkCtx, &this->collider2.base);
+        CollisionCheck_SetOC(globalCtx, &globalCtx->colChkCtx, &this->collider2.base);
+    } else {
+        this->collider2.base.ocFlags1 &= ~OC1_HIT;
+        this->collider2.base.acFlags &= ~AC_HIT;
+    }
+}
+
+
 void EnDodongo_Update(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
     EnDodongo* this = (EnDodongo*)thisx;
 
     EnDodongo_CollisionCheck(this, globalCtx);
+
+    this->frameCount++;
+
+    //STARBURST1 This is where it all begin 
+    EnRrStyle_Swallow(thisx, globalCtx);
+
+
     if (this->actor.colChkInfo.damageEffect != 0xE) {
         this->actionFunc(this, globalCtx);
         Actor_MoveForward(&this->actor);
@@ -793,6 +1075,41 @@ void EnDodongo_Update(Actor* thisx, GlobalContext* globalCtx) {
     this->actor.focus.pos.x = this->actor.world.pos.x + Math_SinS(this->actor.shape.rot.y) * -30.0f;
     this->actor.focus.pos.y = this->actor.world.pos.y + 20.0f;
     this->actor.focus.pos.z = this->actor.world.pos.z + Math_CosS(this->actor.shape.rot.y) * -30.0f;
+
+
+    
+    //if the timers arent 0, go down every frame
+    if (this->grabTimer != 0) {
+        // If Hard Mode is NOT off...
+        if (CVar_GetS32("nLikeLikeMash", 0) != 0) {
+            if (CVar_GetS32("nLikeLikeDamage", 0) != 0) {
+                Player_InflictDamage(globalCtx, -1);
+                if (this->MunchTimer == 16) {
+                    Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_DRINK);
+                    this->MunchTimer = 0;
+                }
+                this->MunchTimer++;
+            }
+            // Damage Function goes here
+        } else {
+            if (CVar_GetS32("nLikeLikeDamage", 0) != 0) {
+                Player_InflictDamage(globalCtx, -1);
+                if (this->MunchTimer == 16) {
+                    Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_DRINK);
+                    this->MunchTimer++;
+                }
+
+                if (this->lettinggo == 0) {
+                    this->grabTimer--;
+                } else {
+                    this->grabTimer=1;
+                }
+            }
+        }
+    }
+    if (this->ocTimer != 0) {
+        this->ocTimer--;
+    }
 }
 
 s32 EnDodongo_OverrideLimbDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
@@ -914,6 +1231,13 @@ void EnDodongo_PostLimbDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dList
 }
 
 void EnDodongo_Draw(Actor* thisx, GlobalContext* globalCtx2) {
+    //william
+    Vec3f zeroVec;///
+    zeroVec.x = 0.0f;
+    zeroVec.y = 0.0f;
+    zeroVec.z = 0.0f;
+
+
     GlobalContext* globalCtx = globalCtx2;
     EnDodongo* this = (EnDodongo*)thisx;
     s32 index;
@@ -932,6 +1256,8 @@ void EnDodongo_Draw(Actor* thisx, GlobalContext* globalCtx2) {
                                            255, 1.8f);
         }
     }
+    //william
+    Matrix_MultVec3f(&zeroVec, &this->mouthPos);///
 }
 
 void EnDodongo_ShiftVecRadial(s16 yaw, f32 radius, Vec3f* vec) {

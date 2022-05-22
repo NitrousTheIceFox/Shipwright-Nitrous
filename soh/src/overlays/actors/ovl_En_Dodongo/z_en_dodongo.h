@@ -37,6 +37,24 @@ typedef struct EnDodongo {
     /* 0x0474 */ ColliderTrisElement trisElements[3];
     /* 0x0588 */ ColliderJntSph colliderBody;
     /* 0x05A8 */ ColliderJntSphElement sphElements[6];
+    //My stuff down here! V V V
+    ColliderCylinder collider2;
+    s16 ocTimer;
+    u8 isDead;
+    u8 isBreathing;
+    s16 grabTimer;
+    s16 hasPlayer;
+    u8 reachState;
+    f32 swallowOffset;
+    s16 frameCount;
+    // ^ ^ ^ starburst
+
+    //Nitrous
+    s16 lettinggo;
+    s16 MunchTimer; //For munch damage sound timing.
+    s16 SpitLock;   //Simple, hacky fix to stop spam spitting out.
+
+
 } EnDodongo; // size = 0x0728
 
 typedef enum {
