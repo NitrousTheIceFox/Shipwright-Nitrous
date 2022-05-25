@@ -5,6 +5,14 @@
 #include "textures/title_static/title_static.h"
 #include "textures/parameter_static/parameter_static.h"
 
+#define Window1Red = CVar_GetS32("nSaveWindow1Red", 100) != 0);
+#define Window1Green = CVar_GetS32("nSaveWindow1Green", 150) != 0);
+#define Window1Blue = CVar_GetS32("nSaveWindow1Blue", 255) != 0);
+
+#define Window2Red = CVar_GetS32("nSaveWindow2Red", 100) != 0);
+#define Window2Green = CVar_GetS32("nSaveWindow2Green", 100) != 0);
+#define Window2Blue = CVar_GetS32("nSaveWindow2Blue", 100) != 0);
+
 static s16 sUnused = 106;
 
 static s16 sScreenFillAlpha = 255;

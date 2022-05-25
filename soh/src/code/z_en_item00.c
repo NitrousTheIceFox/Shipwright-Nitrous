@@ -2,6 +2,7 @@
 #include "overlays/actors/ovl_En_Elf/z_en_elf.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "overlays/effects/ovl_Effect_Ss_Dead_Sound/z_eff_ss_dead_sound.h"
+#include <custom_models/RupeeHD.h>
 
 #define FLAGS 0
 
@@ -1257,7 +1258,11 @@ void EnItem00_DrawRupee(EnItem00* this, GlobalContext* globalCtx) {
 
     gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(sRupeeTex[texIndex]));
 
-    gSPDisplayList(POLY_OPA_DISP++, gRupeeDL);
+    if (CVar_GetS32("nHDDrops", 0) == 0) {
+        gSPDisplayList(POLY_OPA_DISP++, gRupeeDL);
+    } else {
+        gSPDisplayList(POLY_OPA_DISP++, RupeeHD);
+    }
 
     CLOSE_DISPS(globalCtx->state.gfxCtx, "../z_en_item00.c", 1568);
 }

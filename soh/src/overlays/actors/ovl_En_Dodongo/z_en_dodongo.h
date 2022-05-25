@@ -53,6 +53,13 @@ typedef struct EnDodongo {
     s16 lettinggo;
     s16 MunchTimer; //For munch damage sound timing.
     s16 SpitLock;   //Simple, hacky fix to stop spam spitting out.
+    f32 playerPreviousScaleX;
+    f32 playerPreviousScaleY;
+    f32 playerPreviousScaleZ;
+    s16 Health;
+
+    /* 0x0372 */ u8 eatenShield;
+    /* 0x0373 */ u8 eatenTunic;
 
 
 } EnDodongo; // size = 0x0728

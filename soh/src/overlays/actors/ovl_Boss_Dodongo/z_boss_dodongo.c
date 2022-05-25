@@ -36,6 +36,8 @@ f32 func_808C50A8(BossDodongo* this, GlobalContext* globalCtx);
 void BossDodongo_DrawEffects(GlobalContext* globalCtx);
 void BossDodongo_UpdateEffects(GlobalContext* globalCtx);
 
+//Nitrous
+void BossDodongo_ChewPlayer(BossDodongo* this, GlobalContext* globalCtx);
 
 u8 EnKingDodongo_GetMessage(u8 shield, u8 tunic) {
     u8 messageIndex = 0;
@@ -192,11 +194,18 @@ void BossDodongo_SetupInhale(BossDodongo* this, GlobalContext* globalCtx) {
         Player* player = GET_PLAYER(globalCtx);
 
         player->actor.shape.rot.x = 0; //Set Link's rotation to default.
-        player->actor.world.pos = this-> mouthPos;
+        player->actor.world.pos = this->mouthPos;
         this->grab = 0;
         this->spittingout = 0;
         this->stoploop = 0;
         this->stoppingloop = 0;
+
+        player->actor.parent = NULL;
+        player->actor.world.pos.x = this->mouthPos.x;
+        player->actor.world.pos.y = this->mouthPos.y + 20;
+        player->actor.world.pos.z = this->mouthPos.z;
+        player->actor.shape.rot.x = 0;
+        this->hasPlayer = false;
     }
     this->actionFunc = BossDodongo_Inhale;
     this->unk_1DA = 100;
@@ -245,21 +254,29 @@ s32 BossDodongo_AteExplosive(BossDodongo* this, GlobalContext* globalCtx)
         currentExplosive = currentExplosive->next;
     }
 
-    while (currentLink != NULL) 
+    while ((currentLink != NULL))
     {
+        this->LinkNotBomb = 1;
             dx2 = currentLink->world.pos.x - this->mouthPos.x;
             dy2 = currentLink->world.pos.y - this->mouthPos.y;
             dz2 = currentLink->world.pos.z - this->mouthPos.z;
 
+        if (currentLink == thisx) {
+                currentLink = currentLink->next;
+                continue;
+        }
+
+
         if ((fabsf(dx2) < 80.0f) && (fabsf(dy2) < 80.0f) && (fabsf(dz2) < 80.0f) && (player->invincibilityTimer == 0)) {
                 
-                this->grab=1;
                 // "catch"
                 // osSyncPrintf(VT_FGCOL(GREEN) "キャッチ(%d)！！" VT_RST "\n", this->frameCount);
                 if (this->LinkSwallowed == 0) {
-                    if ((this->grab==1) && (this->spittingout == 0) && (this->hasPlayer==false)) {
+                    if ((this->spittingout == 0) && (this->bitingPlayer == false) && (this->hasPlayer==false)) {
                             if (globalCtx->grabPlayer(globalCtx, player)) {
                                 player->actor.parent = &this->actor;
+                                this->hasPlayer = true;
+                                this->bitingPlayer = true;
                                 player->actor.world.pos.x = this->mouthPos.x;
                                 player->actor.world.pos.y = this->mouthPos.y + 20;
                                 player->actor.world.pos.z = this->mouthPos.z;
@@ -269,9 +286,10 @@ s32 BossDodongo_AteExplosive(BossDodongo* this, GlobalContext* globalCtx)
                     }
                 }
                 else if (this->LinkSwallowed == 1) {
-                    if ((this->grab == 1) && (this->spittingout == 0)) {
+                    if (this->spittingout == 0) {
                         if (globalCtx->grabPlayer(globalCtx, player)) {
                             player->actor.parent = &this->actor;
+                            this->hasPlayer = true;
                             player->actor.world.pos.x = this->mouthPos.x;
                             player->actor.world.pos.y = this->mouthPos.y + 70;
                             player->actor.world.pos.z = this->mouthPos.z;
@@ -303,10 +321,8 @@ s32 BossDodongo_AteExplosive(BossDodongo* this, GlobalContext* globalCtx)
             if (((this->grabTimer == 0 ) && (this->stoploop == 0) || (!(player->stateFlags2 & 0x80))) && (this->hasPlayer = true)) {
                 //this->LinkSwallowed == 1;
                 this->ocTimer = 8;
+                Audio_PlayActorSound2(&this->actor, NA_SE_EN_DODO_K_DOWN);
                 BossDodongo_SetupInhale(this, globalCtx);
-                if (this->stoppingloop = 1) {
-                    this->stoploop = 1;
-                }
             } /*else {
                 Math_ApproachF(&player->actor.world.pos.x, this->mouthPos.x, 1.0f, 30.0f);
                 Math_ApproachF(&player->actor.world.pos.y, this->mouthPos.y + this->swallowOffset, 1.0f, 30.0f);
@@ -338,7 +354,11 @@ void BossDodongo_Init(Actor* thisx, GlobalContext* globalCtx) {
     Animation_PlayLoop(&this->skelAnime, &object_kingdodongo_Anim_00F0D8);
     this->unk_1F8 = 1.0f;
     BossDodongo_SetupIntroCutscene(this, globalCtx);
-    this->health = 4; //default 4
+    if (!LINK_IS_ADULT) {
+        this->health = 4; // default 4
+    } else {
+        this->health = 8;
+    }
     this->grabTimer = 0;
     this->invincibilityTimer = 0;
     this->bitingPlayer = 1;
@@ -653,6 +673,37 @@ void BossDodongo_SetupBlowFire(BossDodongo* this) {
     this->actionFunc = BossDodongo_BlowFire;
     this->unk_1DA = 50;
     this->unk_1AE = 0;
+}
+
+void BossDodongo_ChewPlayer(BossDodongo* this, GlobalContext* globalCtx) {
+    this->frameCount++;
+    this->bitingPlayer = 1;
+
+    Animation_Change(&this->skelAnime, &object_kingdodongo_Anim_008EEC, 1.0f, 0.0f, Animation_GetLastFrame(&object_kingdodongo_Anim_008EEC), ANIMMODE_ONCE, -5.0f);
+
+    if (this->grabTimer != 0) {
+        // If Hard Mode is NOT off...
+        if (CVar_GetS32("nLikeLikeMash", 0) != 0) {
+            if (CVar_GetS32("nLikeLikeDamage", 0) != 0) {
+                Player_InflictDamage(globalCtx, -1);
+                if (this->MunchTimer == 16) {
+                    Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_DRINK);
+                    this->MunchTimer = 0;
+                }
+                this->MunchTimer++;
+            }
+            // Damage Function goes here
+        } else {
+            if (CVar_GetS32("nLikeLikeDamage", 0) != 0) {
+                Player_InflictDamage(globalCtx, -1);
+                if (this->MunchTimer == 16) {
+                    Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_DRINK);
+                    this->MunchTimer++;
+                }
+                this->grabTimer--;
+            }
+        }
+    }
 }
 
 void BossDodongo_Damaged(BossDodongo* this, GlobalContext* globalCtx) {
@@ -1072,6 +1123,10 @@ void BossDodongo_Update(Actor* thisx, GlobalContext* globalCtx2) {
 
     this->frameCount++;
 
+    if (this->stoppingloop = 1) {
+        this->stoploop = 1;
+    }
+
     //if (this->hasPlayer != 0) {
 
         //if ((this->bitingPlayer) = 1) {
@@ -1082,30 +1137,6 @@ void BossDodongo_Update(Actor* thisx, GlobalContext* globalCtx2) {
         //}
     //}
 
-        this->frameCount++;
-        if (this->grabTimer != 0) {
-            // If Hard Mode is NOT off...
-            if (CVar_GetS32("nLikeLikeMash", 0) != 0) {
-                if (CVar_GetS32("nLikeLikeDamage", 0) != 0) {
-                    Player_InflictDamage(globalCtx, -1);
-                    if (this->MunchTimer == 16) {
-                        Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_DRINK);
-                        this->MunchTimer = 0;
-                    }
-                    this->MunchTimer++;
-                }
-                // Damage Function goes here
-            } else {
-                if (CVar_GetS32("nLikeLikeDamage", 0) != 0) {
-                    Player_InflictDamage(globalCtx, -1);
-                    if (this->MunchTimer == 16) {
-                        Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_DRINK);
-                        this->MunchTimer++;
-                    }
-                    this->grabTimer--;
-                }
-            }
-        }
         if (this->ocTimer != 0) {
             this->ocTimer--;
         }

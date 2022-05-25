@@ -343,6 +343,10 @@ void EnDodongo_Init(Actor* thisx, GlobalContext* globalCtx) {
     //Nitrous
     this->SpitLock = 0;
     this->lettinggo = 0;
+
+    this->eatenShield = 0;
+    this->eatenTunic = 0;
+
     //
     this->actor.targetMode = 3;
     Actor_ProcessInitChain(&this->actor, sInitChain);
@@ -354,7 +358,14 @@ void EnDodongo_Init(Actor* thisx, GlobalContext* globalCtx) {
     Actor_SetScale(&this->actor, 0.01875f); //Actor_SetScale(&this->actor, 0.01875f);
     SkelAnime_Init(globalCtx, &this->skelAnime, &gDodongoSkel, &gDodongoWaitAnim, this->jointTable, this->morphTable,
                    31);
-    this->actor.colChkInfo.health = 4;
+
+    if (LINK_IS_ADULT) {
+        this->actor.colChkInfo.health = 8;
+    } else {
+        this->actor.colChkInfo.health = 4;
+    }
+     
+
     this->actor.colChkInfo.mass = MASS_HEAVY;
     this->actor.colChkInfo.damageTable = &sDamageTable;
 
@@ -381,6 +392,20 @@ void EnDodongo_Init(Actor* thisx, GlobalContext* globalCtx) {
     blureInit.elemDuration = 8;
     blureInit.unkFlag = false;
     blureInit.calcMode = 2;
+
+    if (LINK_IS_ADULT) {
+        float currentscale_X = this->actor.scale.x;
+        float currentscale_Y = this->actor.scale.y;
+        float currentscale_Z = this->actor.scale.z;
+
+        float newsize_X = (currentscale_X * 2);
+        float newsize_Y = (currentscale_Y * 2);
+        float newsize_Z = (currentscale_Z * 2);
+
+        this->actor.scale.x = newsize_X;
+        this->actor.scale.y = newsize_Y;
+        this->actor.scale.z = newsize_Z;
+    }
 
     Effect_Add(globalCtx, &this->blureIdx, EFFECT_BLURE1, 0, 0, &blureInit);
     Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 75.0f, 60.0f, 70.0f, 0x1D);
@@ -733,6 +758,8 @@ void EnDodongo_SetupDeath(EnDodongo* this, GlobalContext* globalCtx) {
 
 void EnDodongo_Death(EnDodongo* this, GlobalContext* globalCtx) {
     EnBom* bomb;
+    u8 shield;
+    u8 tunic;
 
     if (this->skelAnime.curFrame < 35.0f) {
         if (this->actor.params == EN_DODONGO_SMOKE_DEATH) {
@@ -757,6 +784,26 @@ void EnDodongo_Death(EnDodongo* this, GlobalContext* globalCtx) {
         this->timer--;
         if (this->timer == 0) {
             Item_DropCollectibleRandom(globalCtx, &this->actor, &this->actor.world.pos, 0x40);
+
+            Vec3f dropPos;
+
+            switch (this->eatenShield) {
+                case 1:
+                    Item_DropCollectible(globalCtx, &this->actor.world.pos, ITEM00_SHIELD_DEKU);
+                    break;
+                case 2:
+                    Item_DropCollectible(globalCtx, &this->actor.world.pos, ITEM00_SHIELD_HYLIAN);
+                    break;
+            }
+            switch (this->eatenTunic) {
+                case 2:
+                    Item_DropCollectible(globalCtx, &this->actor.world.pos, ITEM00_TUNIC_GORON);
+                    break;
+                case 3:
+                    Item_DropCollectible(globalCtx, &this->actor.world.pos, ITEM00_TUNIC_ZORA);
+                    break;
+            }
+
             Actor_Kill(&this->actor);
         }
     }
@@ -791,8 +838,14 @@ void EnDodongo_CollisionCheck(EnDodongo* this, GlobalContext* globalCtx) {
             } else {
                 Actor_SetColorFilter(&this->actor, 0x4000, 0x78, 0, 8);
                 if (Actor_ApplyDamage(&this->actor) == 0) {
+                    if (this->hasPlayer) {
+                        EnRrStyle_SetupReleasePlayer(this, globalCtx);
+                    }
                     EnDodongo_SetupDeath(this, globalCtx);
                 } else {
+                    if (this->hasPlayer) {
+                        EnRrStyle_SetupReleasePlayer(this, globalCtx);
+                    }
                     EnDodongo_SetupSweepTail(this);
                 }
             }
@@ -850,6 +903,25 @@ void EnRrStyle_CollisionCheck(EnDodongo* this, GlobalContext* globalCtx) {
             // "catch"
             if (globalCtx->grabPlayer(globalCtx, player)) { //As you know this sets link as grabbed
                 player->actor.parent = &this->actor; //and ya gotta parent him of course
+
+                player->actor.world.pos = this->mouthPos;
+
+                //Get the player's current scale
+                this->playerPreviousScaleX = player->actor.scale.x;
+                this->playerPreviousScaleY = player->actor.scale.y;
+                this->playerPreviousScaleZ = player->actor.scale.z;
+
+                //Make player invisible (NEW) //Nitrous
+                player->actor.scale.x = 0.001f;
+                player->actor.scale.y = 0.001f;
+                player->actor.scale.z = 0.001f;
+
+                //gulp animation
+                this->bodyScale.y = this->bodyScale.z =
+                    (Math_SinS(this->actor.colorFilterTimer * 0x1000) * 0.5f) + 1.0f;
+                this->bodyScale.x = Math_SinS(this->actor.colorFilterTimer * 0x1000) + 1.0f;
+
+
                 EnRrStyle_SetupGrabPlayer(this, player); //now we move on to setupd
             }
         }
@@ -978,6 +1050,17 @@ void EnRrStyle_SetupReleasePlayer(EnDodongo* this, GlobalContext* globalCtx) {
     //Yay release player
     Player* player = GET_PLAYER(globalCtx);
 
+    //Nitrous (from BreatheFire)
+    s32 pad;
+    Vec3f velocity = { 0.0f, 0.0f, 0.0f };
+    Vec3f accel = { 0.0f, 0.0f, 0.0f };
+    Vec3f pos;
+    s16 pad2;
+    s16 fireFrame;
+
+    u8 shield;
+    u8 tunic;
+
     this->hasPlayer = false;
     this->ocTimer = 110;
     this->grabTimer = 0;
@@ -985,7 +1068,35 @@ void EnRrStyle_SetupReleasePlayer(EnDodongo* this, GlobalContext* globalCtx) {
     tunic = 0;
     shield = 0;
 
-    player->actor.parent = NULL; //unparent of course
+    
+
+
+    //I DID IT! I just had to add these 2 lines to get the spit out animation! :D Maybe I could use this knowledge for King Dodongo?
+    this->skelAnime.curFrame = 23;
+    Audio_PlayActorSound2(&this->actor, NA_SE_EN_DODO_J_CRY);
+
+    EffectSsDFire_SpawnFixedScale(globalCtx, &pos, &velocity, &accel, 255 - (fireFrame * 10), fireFrame + 3);
+
+    Audio_PlayActorSound2(&this->actor, NA_SE_EN_DODO_J_CRY);
+    EnDodongo_ShiftVecRadial(this->actor.world.rot.y, 2.5f, &accel);
+    EnDodongo_EndBreatheFire;
+
+
+    if (CUR_EQUIP_VALUE(EQUIP_SHIELD) != 3 /* Mirror shield */) {
+        shield = Inventory_DeleteEquipment(globalCtx, EQUIP_SHIELD);
+        if (shield != 0) {
+            this->eatenShield = shield;
+            //this->retreat = true;
+        }
+    }
+    if (CUR_EQUIP_VALUE(EQUIP_TUNIC) != 1 /* Kokiri tunic */) {
+        tunic = Inventory_DeleteEquipment(globalCtx, EQUIP_TUNIC);
+        if (tunic != 0) {
+            this->eatenTunic = tunic;
+            //this->retreat = true;
+        }
+    }
+
     switch (EnDodongo_GetMessage(shield, tunic)) {
         case RR_MESSAGE_SHIELD:
             Message_StartTextbox(globalCtx, 0x305F, NULL);
@@ -1002,6 +1113,14 @@ void EnRrStyle_SetupReleasePlayer(EnDodongo* this, GlobalContext* globalCtx) {
     if (this->actor.colorFilterTimer == 0) {
         this->actionFunc = EnDodongo_EndBreatheFire;
         Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_THROW);
+        player->isBurning = 1; // Being eaten by a Dodongo ought to set you on fire. xD
+        player->actor.world.pos.x = this->mouthPos.x;
+        player->actor.world.pos.z = this->mouthPos.z;
+        player->actor.world.pos.y = this->mouthPos.y + 20;
+        player->actor.parent = NULL; // unparent of course, Sarcose and Starburst
+        player->actor.scale.x = this->playerPreviousScaleX;
+        player->actor.scale.y = this->playerPreviousScaleY;
+        player->actor.scale.z = this->playerPreviousScaleZ;
     }
     //Damage? what damage? I've never heard of damage in my life.
     /* else if (this->actor.colChkInfo.health != 0) {
@@ -1082,30 +1201,33 @@ void EnDodongo_Update(Actor* thisx, GlobalContext* globalCtx) {
 
     
     //if the timers arent 0, go down every frame
-    if (this->grabTimer != 0) {
-        // If Hard Mode is NOT off...
-        if (CVar_GetS32("nLikeLikeMash", 0) != 0) {
-            if (CVar_GetS32("nLikeLikeDamage", 0) != 0) {
-                Player_InflictDamage(globalCtx, -1);
-                if (this->MunchTimer == 16) {
-                    Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_DRINK);
-                    this->MunchTimer = 0;
-                }
-                this->MunchTimer++;
-            }
-            // Damage Function goes here
-        } else {
-            if (CVar_GetS32("nLikeLikeDamage", 0) != 0) {
-                Player_InflictDamage(globalCtx, -1);
-                if (this->MunchTimer == 16) {
-                    Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_DRINK);
+    if (this->hasPlayer == true) {
+        if (this->grabTimer != 0) {
+            // If Hard Mode is NOT off...
+            if (CVar_GetS32("nLikeLikeMash", 0) != 0) {
+                if (CVar_GetS32("nLikeLikeDamage", 0) != 0) {
+                    Player_InflictDamage(globalCtx, -1);
+                    if (this->MunchTimer == 16) {
+                        Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_DRINK);
+                        this->MunchTimer = 0;
+                    }
                     this->MunchTimer++;
                 }
+                // Damage Function goes here
+            } else {
+                if (CVar_GetS32("nLikeLikeDamage", 0) != 0) {
+                    Player_InflictDamage(globalCtx, -1);
+                    if (this->MunchTimer == 16) {
+                        Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_DRINK);
+                        this->MunchTimer++;
+                    }
 
-                if (this->lettinggo == 0) {
-                    this->grabTimer--;
-                } else {
-                    this->grabTimer=1;
+                    if ((this->lettinggo == 0) && (this->grabTimer > 1)) {
+                        this->grabTimer--;
+                    } else
+                        {
+                            this->grabTimer = 1;
+                        }
                 }
             }
         }
