@@ -859,6 +859,8 @@ namespace SohImGui {
                         ImGui::Text("Difficulty:");
                         EnhancementCheckbox("Button Mash", "nLikeLikeMash");
                         Tooltip("If this is turned on, you NEED to mash to escape.");
+                        EnhancementCheckbox("Must be leaning to Grab Link", "nLikeLikeMMGrab");
+                        Tooltip("If enabled, Like Likes need to be leaning to grab Link (MM-Style)");
                         EnhancementSliderInt("Like Like Spawn Health (Default: 4): %d", "##LikeLikeHP", "nLikeLikeHealth", 1, 100, "");
                         EnhancementCheckbox("Like Like Munch Damage", "nLikeLikeDamage");
                         Tooltip("If this is turned on, Like Like's damage you constantly when they've eaten you. Makes the vanilla mash to escape sooner more of a use, and the Like Likes MUCH more of a threat.");

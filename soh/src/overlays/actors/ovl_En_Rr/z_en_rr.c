@@ -86,8 +86,8 @@ static ColliderCylinderInitType1 sCylinderInit1 = {
     {
         COLTYPE_NONE,
         AT_NONE,
-        AC_ON | AC_HARD | AC_TYPE_PLAYER,
-        OC1_ON | OC1_NO_PUSH | OC1_TYPE_PLAYER,
+        AC_ON | AC_TYPE_PLAYER,
+        OC1_ON | OC1_TYPE_PLAYER,
         COLSHAPE_CYLINDER,
     },
     {
@@ -168,14 +168,12 @@ void EnRr_Init(Actor* thisx, GlobalContext* globalCtx2) {
 
     Actor_ProcessInitChain(&this->actor, sInitChain);
     this->actor.colChkInfo.damageTable = &sDamageTable;
+    this->actor.colChkInfo.health = CVar_GetS32("nLikeLikeHealth", 4); // 4 is default
     Collider_InitCylinder(globalCtx, &this->collider1);
     Collider_SetCylinderType1(globalCtx, &this->collider1, &this->actor, &sCylinderInit1);
     Collider_InitCylinder(globalCtx, &this->collider2);
     Collider_SetCylinderType1(globalCtx, &this->collider2, &this->actor, &sCylinderInit2);
     Actor_SetFocus(&this->actor, 30.0f);
-
-    // Nitrous' CVars
-
     if (CVar_GetS32("nLikeLikeSizeFix", 0) == 0) {
         if (CVar_GetS32("nLikeLikeSizeMode", 0) == 0) // OoT
         {
@@ -233,13 +231,11 @@ void EnRr_Init(Actor* thisx, GlobalContext* globalCtx2) {
     this->actionTimer = 0;
     this->eatenShield = 0;
     this->eatenTunic = 0;
-    this->MunchTimer = 0;
     this->retreat = false;
     this->grabTimer = 0;
     this->invincibilityTimer = 0;
     this->effectTimer = 0;
     this->hasPlayer = false;
-    this->actor.colChkInfo.health = CVar_GetS32("nLikeLikeHealth", 4); // 4 is default
     this->stopScroll = false;
     this->ocTimer = 0;
     this->reachState = this->isDead = false;
@@ -343,13 +339,29 @@ void EnRr_SetupReleasePlayer(EnRr* this, GlobalContext* globalCtx) {
 
     this->actor.flags |= ACTOR_FLAG_0;
     this->hasPlayer = false;
-    this->grabTimer = 0;
     this->ocTimer = 110;
     this->segMoveRate = 0.0f;
     this->segPhaseVelTarget = 2500.0f;
     this->wobbleSizeTarget = 2048.0f;
+    this->grabTimer = 0;
     tunic = 0;
     shield = 0;
+
+    //float i = (this->mouthPos.y + this->swallowOffset);
+
+    player->actor.world.pos = this->mouthPos;
+
+    if (CVar_GetS32("nLikeLikeSizeMode", 0) == 0) // OoT
+    {
+        Math_ApproachF(&this->swallowOffset, -55.0f, 1.0f, 5.0f);
+    }
+    if (CVar_GetS32("nLikeLikeSizeMode", 0) == 1) // MM
+    {
+        Math_ApproachF(&this->swallowOffset, -137.5f, 1.0f, 12.5f);
+    }
+
+    //Math_ApproachF(&player->actor.world.pos.y, this->mouthPos.y + this->swallowOffset, 1.0f, 30.0f);
+
     if (CUR_EQUIP_VALUE(EQUIP_SHIELD) != 3 /* Mirror shield */) {
         shield = Inventory_DeleteEquipment(globalCtx, EQUIP_SHIELD);
         if (shield != 0) {
@@ -549,17 +561,19 @@ void EnRr_CollisionCheck(EnRr* this, GlobalContext* globalCtx) {
                     return;
             }
         }
-        if ((this->ocTimer == 0) && (this->actor.colorFilterTimer == 0) && (player->invincibilityTimer == 0) &&
-            !(player->stateFlags2 & 0x80) &&
-            ((this->collider1.base.ocFlags1 & OC1_HIT) || (this->collider2.base.ocFlags1 & OC1_HIT))) {
-            this->collider1.base.ocFlags1 &= ~OC1_HIT;
-            this->collider2.base.ocFlags1 &= ~OC1_HIT;
-            // "catch"
-            osSyncPrintf(VT_FGCOL(GREEN) "キャッチ(%d)！！" VT_RST "\n", this->frameCount);
-            if (globalCtx->grabPlayer(globalCtx, player)) {
-                player->actor.parent = &this->actor;
-                this->stopScroll = false;
-                EnRr_SetupGrabPlayer(this, player);
+        if ((this->reachState != 0) || (CVar_GetS32("nLikeLikeMMGrab", 0) == 0)) {
+            if ((this->ocTimer == 0) && (this->actor.colorFilterTimer == 0) && (player->invincibilityTimer == 0) &&
+                !(player->stateFlags2 & 0x80) &&
+                ((this->collider1.base.ocFlags1 & OC1_HIT) || (this->collider2.base.ocFlags1 & OC1_HIT))) {
+                this->collider1.base.ocFlags1 &= ~OC1_HIT;
+                this->collider2.base.ocFlags1 &= ~OC1_HIT;
+                // "catch"
+                osSyncPrintf(VT_FGCOL(GREEN) "キャッチ(%d)！！" VT_RST "\n", this->frameCount);
+                if (globalCtx->grabPlayer(globalCtx, player)) {
+                    player->actor.parent = &this->actor;
+                    this->stopScroll = false;
+                    EnRr_SetupGrabPlayer(this, player);
+                }
             }
         }
     }
@@ -625,7 +639,6 @@ void EnRr_UpdateBodySegments(EnRr* this, GlobalContext* globalCtx) {
 void EnRr_Approach(EnRr* this, GlobalContext* globalCtx) {
     Math_SmoothStepToS(&this->actor.shape.rot.y, this->actor.yawTowardsPlayer, 0xA, 0x1F4, 0);
     this->actor.world.rot.y = this->actor.shape.rot.y;
-
     if (CVar_GetS32("nLikeLikeSizeMode", 0) == 0) // OoT
     {
         if ((this->actionTimer == 0) && (this->actor.xzDistToPlayer < 160.0f)) {
@@ -840,7 +853,7 @@ void EnRr_Update(Actor* thisx, GlobalContext* globalCtx) {
     if (this->actionTimer != 0) {
         this->actionTimer--;
     }
-    if (this->grabTimer != 0) {
+    if ((this->grabTimer != 0) && (this->hasPlayer = true)) {
         // If Hard Mode is NOT off...
         if (CVar_GetS32("nLikeLikeMash", 0) != 0) {
             if (CVar_GetS32("nLikeLikeDamage", 0) != 0) {
@@ -888,18 +901,8 @@ void EnRr_Update(Actor* thisx, GlobalContext* globalCtx) {
     Actor_MoveForward(&this->actor);
     Collider_UpdateCylinder(&this->actor, &this->collider1);
     this->collider2.dim.pos.x = this->mouthPos.x;
-    // this->collider2.dim.pos.y = this->mouthPos.y;
-    if (CVar_GetS32("nLikeLikeSizeMode", 0) == 0) {
-        this->collider2.dim.pos.y = this->mouthPos.y;
-    }
-    if (CVar_GetS32("nLikeLikeSizeMode", 0) == 1) {
-        this->collider2.dim.pos.y = this->mouthPos.y - 40;
-    }
+    this->collider2.dim.pos.y = this->mouthPos.y;
     this->collider2.dim.pos.z = this->mouthPos.z;
-    this->collider2.dim.height = this->MouthHeight;
-    this->collider2.dim.radius = this->MouthRadius;
-    this->collider1.dim.height = this->BodyHeight;
-    this->collider1.dim.radius = this->BodyRadius;
     if (!this->isDead && (this->invincibilityTimer == 0)) {
         CollisionCheck_SetAC(globalCtx, &globalCtx->colChkCtx, &this->collider1.base);
         CollisionCheck_SetAC(globalCtx, &globalCtx->colChkCtx, &this->collider2.base);
