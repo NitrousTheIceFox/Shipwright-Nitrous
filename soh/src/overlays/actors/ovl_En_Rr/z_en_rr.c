@@ -347,7 +347,7 @@ void EnRr_SetupReleasePlayer(EnRr* this, GlobalContext* globalCtx) {
     tunic = 0;
     shield = 0;
 
-    //float i = (this->mouthPos.y + this->swallowOffset);
+    // float i = (this->mouthPos.y + this->swallowOffset);
 
     player->actor.world.pos = this->mouthPos;
 
@@ -360,7 +360,7 @@ void EnRr_SetupReleasePlayer(EnRr* this, GlobalContext* globalCtx) {
         Math_ApproachF(&this->swallowOffset, -137.5f, 1.0f, 12.5f);
     }
 
-    //Math_ApproachF(&player->actor.world.pos.y, this->mouthPos.y + this->swallowOffset, 1.0f, 30.0f);
+    // Math_ApproachF(&player->actor.world.pos.y, this->mouthPos.y + this->swallowOffset, 1.0f, 30.0f);
 
     if (CUR_EQUIP_VALUE(EQUIP_SHIELD) != 3 /* Mirror shield */) {
         shield = Inventory_DeleteEquipment(globalCtx, EQUIP_SHIELD);

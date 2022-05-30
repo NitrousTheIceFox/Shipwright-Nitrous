@@ -53,7 +53,7 @@ typedef struct BossDodongo {
     /* 0x01CA */ char unk_1CA[0x2];
     /* 0x01CC */ s16 unk_1CC;
     /* 0x01CE */ char unk_1CE[0xC];
-    /* 0x01DA */ s16 unk_1DA; 
+    /* 0x01DA */ s16 unk_1DA;
     /* 0x01DC */ s16 unk_1DC;
     /* 0x01DE */ s16 unk_1DE;
     /* 0x01E0 */ s16 unk_1E0;
@@ -97,28 +97,29 @@ typedef struct BossDodongo {
     /* 0x0460 */ ColliderJntSphElement items[19];
     /* 0x0920 */ BossDodongoEffect effects[80];
 
-        s16 canEatPlayer;
-        s16 bitingPlayer; //used for sounds and damage.
-        s16 playerBelly;  //also used for sound and damage.
-        s16 hasPlayer;
-        s16 grabTimer;
-        f32 swallowOffset;
-        s16 ocTimer; //Button Mash? CORRECTION: Time before collision / hitbox can be made again.
-        s16 MunchTimer; // for munching sound.
+    s16 canEatPlayer;
+    s16 bitingPlayer; // used for sounds and damage.
+    s16 playerBelly;  // also used for sound and damage.
+    s16 hasPlayer;
+    s16 grabTimer;
+    f32 swallowOffset;
+    s16 ocTimer;    // Button Mash? CORRECTION: Time before collision / hitbox can be made again.
+    s16 MunchTimer; // for munching sound.
 
-        u8 eatenShield;
-        /* 0x0373 */ u8 eatenTunic;
+    u8 eatenShield;
+    /* 0x0373 */ u8 eatenTunic;
 
-        s16 LinkNotBomb; //Used as a variable for checking if Link was eaten and not the bomb.
+    s16 LinkNotBomb; // Used as a variable for checking if Link was eaten and not the bomb.
 
-        s16 frameCount; //used for sound loop rate.
-        s16 LinkSwallowed; //Is Link in Dodongo's Belly?
-        s16 invincibilityTimer;
-        s16 swallowTimer; //Time Player has left before Link is swallowed.
-        s16 spittingout; //is King Dodongo going to spit Link out? (finished bunching or keeping link in his belly?)
-        s16 grab; //is King Dodongo holding Link?
-        s16 stoploop; //stop the looping in AteExplosive.
-        s16 stoppingloop; //used to make the loop go one last time to set stop loop, to also execute the inhale without it doing the biting effect..
+    s16 frameCount;    // used for sound loop rate.
+    s16 LinkSwallowed; // Is Link in Dodongo's Belly?
+    s16 invincibilityTimer;
+    s16 swallowTimer; // Time Player has left before Link is swallowed.
+    s16 spittingout;  // is King Dodongo going to spit Link out? (finished bunching or keeping link in his belly?)
+    s16 grab;         // is King Dodongo holding Link?
+    s16 stoploop;     // stop the looping in AteExplosive.
+    s16 stoppingloop; // used to make the loop go one last time to set stop loop, to also execute the inhale without it
+                      // doing the biting effect..
 
 } BossDodongo; // size = 0x1820
 
