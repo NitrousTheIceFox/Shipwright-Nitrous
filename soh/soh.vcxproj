@@ -173,6 +173,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="include\custom_models\RupeeHD - Copy.c" />
+    <ClCompile Include="include\custom_models\RupeeHD.c" />
     <ClCompile Include="soh\frame_interpolation.cpp" />
     <ClCompile Include="soh\Enhancements\bootcommands.c" />
     <ClCompile Include="soh\Enhancements\debugconsole.cpp" />
@@ -879,6 +881,8 @@
     <ClCompile Include="src\overlays\misc\ovl_map_mark_data\z_map_mark_data.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\custom_models\RupeeHD - Copy.h" />
+    <ClInclude Include="include\custom_models\RupeeHD.h" />
     <ClInclude Include="soh\frame_interpolation.h" />
     <ClInclude Include="include\alloca.h" />
     <ClInclude Include="include\bgm.h" />

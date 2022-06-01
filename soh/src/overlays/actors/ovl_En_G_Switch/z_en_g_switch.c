@@ -11,6 +11,7 @@
 #include "overlays/effects/ovl_Effect_Ss_HitMark/z_eff_ss_hitmark.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "objects/object_tsubo/object_tsubo.h"
+#include <custom_models/RupeeHD.h>
 
 #define FLAGS (ACTOR_FLAG_4 | ACTOR_FLAG_5)
 
@@ -480,7 +481,11 @@ void EnGSwitch_DrawRupee(Actor* thisx, GlobalContext* globalCtx) {
         gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(globalCtx->state.gfxCtx, "../z_en_g_switch.c", 957),
                   G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
         gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(sRupeeTextures[this->colorIdx]));
-        gSPDisplayList(POLY_OPA_DISP++, gRupeeDL);
+        if (CVar_GetS32("nHDDrops", 0) == 0) {
+            gSPDisplayList(POLY_OPA_DISP++, gRupeeDL);
+        } else {
+            gSPDisplayList(POLY_OPA_DISP++, RupeeHD);
+        }
         CLOSE_DISPS(globalCtx->state.gfxCtx, "../z_en_g_switch.c", 961);
     }
     if (this->type == ENGSWITCH_TARGET_RUPEE) {
