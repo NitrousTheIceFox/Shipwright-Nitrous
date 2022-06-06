@@ -1,3 +1,39 @@
+# SoH - Nitrous' Branch
+
+This branch contains various edits and improvements that are done by me, and where noted, by others and friends. :)
+
+# Current changes:
+
+## "Elemental" cheats:
+Nitrous' Blessing (Can't Freeze) Fireproof (Can't be lit on fire)
+
+## Enhanced Like Like: A "customizable" Like Like that can be tweaked to be easier or harder.
+	1) Button Mash: Option that can be toggled, which decides whether you NEED to mash to escape (Default: OFF)
+	2) Health: Sets Like Likes' health. (Default: 4)
+	3) Size: Lets you choose between standard OoT size and "Great Bay" size (Majora's Mask Giant Like Like)
+	4) Munch Damage: Like Likes now damage you while you're caught by them, making them far more dangerous!
+	5) MM-like Like Like behaviour: Like Likes can be set to whether they need to be leaning to grab you (just like in MM, however, trying to figure out how to make them solid as well, to prevent you straight through them like a ghost, and to make them more accurate to their MM versions.)
+
+## Improved Dodongo: Dodongos are now slightly tougher. ^^
+	1) Inhale ability (Credit to Starburst for starting on the code, I've done a few little animation fixes and tweaks. Still a little Work In Progress)
+	2) Dodongos are bigger in the Adult Link timeline, and tougher.
+
+## Tougher, more fearsome King Dodongo (VERY Work in progress)
+	1) Getting too close to him (While he is breathing in), will result in him catching you in his jaws, where he'll bite at you! (Broken right now, but did work at one point...)
+	Plans:
+
+
+## HD ITEM MODELS!!! (For now, requires 3D Item drops disabled, and Nitrous' Tweaks > HD Models to be enabled. ^^;)
+All rupees now have a new "HD" Model which was made by me in Blender. They retain their original textures, too.
+Silver Rupees have also been replaced recently. ^^
+
+	
+## CREDITS:
+MelonSpeedruns - Showing me how to get models into SoH with Fast3D Blender Plugin
+Jack Walker - Fixing the rupee texture crash (I had to use 0x800001 instead of 0x800000)
+Purple Hato, Bauolettes, Sarcose, Starburst, and Continued - for helping and being an inspiration. ^^
+
+(Original SoH Readme below:)
 # Welcome to the Ship of Harkinian!
 
 A PC port of OoT allowing you to enjoy the game with modern controls, widescreen, high-resolution, gyroscopy and other great features! Setup is simple, let's get started!
