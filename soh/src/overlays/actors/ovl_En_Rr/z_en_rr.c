@@ -865,15 +865,16 @@ void EnRr_Update(Actor* thisx, GlobalContext* globalCtx) {
                 this->MunchTimer++;
             }
             // Damage Function goes here
-        } else {
+        }
+        else {
             if (CVar_GetS32("nLikeLikeDamage", 0) != 0) {
                 Player_InflictDamage(globalCtx, -1);
                 if (this->MunchTimer == 16) {
                     Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_DRINK);
                     this->MunchTimer++;
                 }
-                this->grabTimer--;
             }
+            this->grabTimer--;
         }
     }
     if (this->ocTimer != 0) {
