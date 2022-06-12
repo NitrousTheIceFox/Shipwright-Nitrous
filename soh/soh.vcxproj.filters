@@ -705,8 +705,7 @@
     <ClCompile Include="src\overlays\misc\ovl_kaleido_scope\z_lmap_mark.c" />
     <ClCompile Include="src\overlays\misc\ovl_kaleido_scope\z_lmap_mark_data.c" />
     <ClCompile Include="src\overlays\misc\ovl_map_mark_data\z_map_mark_data.c" />
-    <ClCompile Include="include\custom_models\RupeeHD - Copy.c" />
-    <ClCompile Include="include\custom_models\RupeeHD.c" />
+    <ClCompile Include="soh\Enhancements\debugger\actorViewer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="soh\frame_interpolation.h" />
@@ -1230,8 +1229,7 @@
     <ClInclude Include="src\overlays\effects\ovl_Effect_Ss_Stick\z_eff_ss_stick.h" />
     <ClInclude Include="src\overlays\effects\ovl_Effect_Ss_Stone1\z_eff_ss_stone1.h" />
     <ClInclude Include="src\overlays\misc\ovl_kaleido_scope\z_kaleido_scope.h" />
-    <ClInclude Include="include\custom_models\RupeeHD - Copy.h" />
-    <ClInclude Include="include\custom_models\RupeeHD.h" />
+    <ClInclude Include="soh\Enhancements\debugger\actorViewer.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc" />

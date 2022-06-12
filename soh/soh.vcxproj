@@ -175,6 +175,7 @@
   <ItemGroup>
     <ClCompile Include="include\custom_models\RupeeHD - Copy.c" />
     <ClCompile Include="include\custom_models\RupeeHD.c" />
+    <ClCompile Include="soh\Enhancements\debugger\actorViewer.cpp" />
     <ClCompile Include="soh\frame_interpolation.cpp" />
     <ClCompile Include="soh\Enhancements\bootcommands.c" />
     <ClCompile Include="soh\Enhancements\debugconsole.cpp" />
@@ -883,6 +884,7 @@
   <ItemGroup>
     <ClInclude Include="include\custom_models\RupeeHD - Copy.h" />
     <ClInclude Include="include\custom_models\RupeeHD.h" />
+    <ClInclude Include="soh\Enhancements\debugger\actorViewer.h" />
     <ClInclude Include="soh\frame_interpolation.h" />
     <ClInclude Include="include\alloca.h" />
     <ClInclude Include="include\bgm.h" />
