@@ -168,14 +168,63 @@ void EnRr_Init(Actor* thisx, GlobalContext* globalCtx2) {
 
     Actor_ProcessInitChain(&this->actor, sInitChain);
     this->actor.colChkInfo.damageTable = &sDamageTable;
-    this->actor.colChkInfo.health = 4;
+    this->actor.colChkInfo.health = CVar_GetS32("nLikeLikeHealth", 4); // 4 is default
     Collider_InitCylinder(globalCtx, &this->collider1);
     Collider_SetCylinderType1(globalCtx, &this->collider1, &this->actor, &sCylinderInit1);
     Collider_InitCylinder(globalCtx, &this->collider2);
     Collider_SetCylinderType1(globalCtx, &this->collider2, &this->actor, &sCylinderInit2);
     Actor_SetFocus(&this->actor, 30.0f);
-    this->actor.scale.y = 0.013f;
-    this->actor.scale.x = this->actor.scale.z = 0.014f;
+    if (CVar_GetS32("nLikeLikeSizeFix", 0) == 0) {
+        if (CVar_GetS32("nLikeLikeSizeMode", 0) == 0) // OoT
+        {
+            this->actor.scale.y = 0.013f;
+            this->actor.scale.x = this->actor.scale.z = 0.014f;
+            this->MouthHeight = 20; //* this->actor.scale.z;
+            this->MouthRadius = 20; //* this->actor.scale.y;
+            this->BodyHeight = 55;  //* this->actor.scale.z;
+            this->BodyRadius = 30;  //* this->actor.scale.y;
+            this->mouthPos.y = -10;
+        }
+        if (CVar_GetS32("nLikeLikeSizeMode", 0) == 1) // MM
+        {
+            this->actor.scale.y = 0.0335f;
+            this->actor.scale.x = this->actor.scale.z = 0.035f;
+            this->MouthHeight = 80;   //* this->actor.scale.z;
+            this->MouthRadius = 80;   //* this->actor.scale.y;
+            this->BodyHeight = 137.5; //* this->actor.scale.z;
+            this->BodyRadius = 75;    //* this->actor.scale.y;
+            this->mouthPos.y = 20;
+        }
+        // if (CVar_GetS32("nLikeLikeSizeMode", 0) == 2) // Custom
+        //{
+        //     this->actor.scale.x = CVar_GetFloat("nLikeLikeCustomXSize", 0.014f);
+        //     this->actor.scale.y = CVar_GetFloat("nLikeLikeCustomYSize", 0.013f);
+        //     this->actor.scale.z = CVar_GetFloat("nLikeLikeCustomZSize", 0.014f);
+        //     this->MouthHeight = 20 * (CVar_GetFloat("nLikeLikeCustomZSize", 0.014f) * 100);
+        //     this->MouthRadius = 20 * (CVar_GetFloat("nLikeLikeCustomYSize", 0.013f) * 100);
+        //     this->MouthZOffset = 0 * (CVar_GetFloat("gLanguages", 0));
+        //     this->BodyHeight = 55 * (CVar_GetFloat("gLanguages", 0));
+        //     this->BodyRadius = 30 * (CVar_GetFloat("gLanguages", 0));
+        //     this->BodyZOffset = -10 * (CVar_GetFloat("gLanguages", 0));
+        // }
+    } else {
+        if (CVar_GetS32("nLikeLikeSizeMode", 0) == 0) // OoT
+        {
+            this->actor.scale.y = 0.014f;
+            this->actor.scale.x = this->actor.scale.z = 0.014f;
+        }
+        if (CVar_GetS32("nLikeLikeSizeMode", 0) == 1) // MM
+        {
+            this->actor.scale.y = 0.042f;
+            this->actor.scale.x = this->actor.scale.z = 0.042f;
+        }
+        // if (CVar_GetS32("nLikeLikeSizeMode", 0) == 2) //Custom
+        //{
+        //     this->actor.scale.x = CVar_GetS32("nLikeLikeCustomESize", 0.014f);
+        //     this->actor.scale.y = CVar_GetS32("nLikeLikeCustomESize", 0.014f);
+        //     this->actor.scale.z = CVar_GetS32("nLikeLikeCustomESize", 0.014f);
+        // }
+    }
     this->actor.colChkInfo.mass = MASS_IMMOVABLE;
     this->actor.velocity.y = this->actor.speedXZ = 0.0f;
     this->actor.gravity = -0.4f;
@@ -294,8 +343,25 @@ void EnRr_SetupReleasePlayer(EnRr* this, GlobalContext* globalCtx) {
     this->segMoveRate = 0.0f;
     this->segPhaseVelTarget = 2500.0f;
     this->wobbleSizeTarget = 2048.0f;
+    this->grabTimer = 0;
     tunic = 0;
     shield = 0;
+
+    // float i = (this->mouthPos.y + this->swallowOffset);
+
+    player->actor.world.pos = this->mouthPos;
+
+    if (CVar_GetS32("nLikeLikeSizeMode", 0) == 0) // OoT
+    {
+        Math_ApproachF(&this->swallowOffset, -55.0f, 1.0f, 5.0f);
+    }
+    if (CVar_GetS32("nLikeLikeSizeMode", 0) == 1) // MM
+    {
+        Math_ApproachF(&this->swallowOffset, -137.5f, 1.0f, 12.5f);
+    }
+
+    // Math_ApproachF(&player->actor.world.pos.y, this->mouthPos.y + this->swallowOffset, 1.0f, 30.0f);
+
     if (CUR_EQUIP_VALUE(EQUIP_SHIELD) != 3 /* Mirror shield */) {
         shield = Inventory_DeleteEquipment(globalCtx, EQUIP_SHIELD);
         if (shield != 0) {
@@ -495,17 +561,19 @@ void EnRr_CollisionCheck(EnRr* this, GlobalContext* globalCtx) {
                     return;
             }
         }
-        if ((this->ocTimer == 0) && (this->actor.colorFilterTimer == 0) && (player->invincibilityTimer == 0) &&
-            !(player->stateFlags2 & 0x80) &&
-            ((this->collider1.base.ocFlags1 & OC1_HIT) || (this->collider2.base.ocFlags1 & OC1_HIT))) {
-            this->collider1.base.ocFlags1 &= ~OC1_HIT;
-            this->collider2.base.ocFlags1 &= ~OC1_HIT;
-            // "catch"
-            osSyncPrintf(VT_FGCOL(GREEN) "キャッチ(%d)！！" VT_RST "\n", this->frameCount);
-            if (globalCtx->grabPlayer(globalCtx, player)) {
-                player->actor.parent = &this->actor;
-                this->stopScroll = false;
-                EnRr_SetupGrabPlayer(this, player);
+        if ((this->reachState != 0) || (CVar_GetS32("nLikeLikeMMGrab", 0) == 0)) {
+            if ((this->ocTimer == 0) && (this->actor.colorFilterTimer == 0) && (player->invincibilityTimer == 0) &&
+                !(player->stateFlags2 & 0x80) &&
+                ((this->collider1.base.ocFlags1 & OC1_HIT) || (this->collider2.base.ocFlags1 & OC1_HIT))) {
+                this->collider1.base.ocFlags1 &= ~OC1_HIT;
+                this->collider2.base.ocFlags1 &= ~OC1_HIT;
+                // "catch"
+                osSyncPrintf(VT_FGCOL(GREEN) "キャッチ(%d)！！" VT_RST "\n", this->frameCount);
+                if (globalCtx->grabPlayer(globalCtx, player)) {
+                    player->actor.parent = &this->actor;
+                    this->stopScroll = false;
+                    EnRr_SetupGrabPlayer(this, player);
+                }
             }
         }
     }
@@ -571,10 +639,21 @@ void EnRr_UpdateBodySegments(EnRr* this, GlobalContext* globalCtx) {
 void EnRr_Approach(EnRr* this, GlobalContext* globalCtx) {
     Math_SmoothStepToS(&this->actor.shape.rot.y, this->actor.yawTowardsPlayer, 0xA, 0x1F4, 0);
     this->actor.world.rot.y = this->actor.shape.rot.y;
-    if ((this->actionTimer == 0) && (this->actor.xzDistToPlayer < 160.0f)) {
-        EnRr_SetupReach(this);
-    } else if ((this->actor.xzDistToPlayer < 400.0f) && (this->actor.speedXZ == 0.0f)) {
-        EnRr_SetSpeed(this, 2.0f);
+    if (CVar_GetS32("nLikeLikeSizeMode", 0) == 0) // OoT
+    {
+        if ((this->actionTimer == 0) && (this->actor.xzDistToPlayer < 160.0f)) {
+            EnRr_SetupReach(this);
+        } else if ((this->actor.xzDistToPlayer < 400.0f) && (this->actor.speedXZ == 0.0f)) {
+            EnRr_SetSpeed(this, 2.0f);
+        }
+    }
+    if (CVar_GetS32("nLikeLikeSizeMode", 0) == 1) // OoT
+    {
+        if ((this->actionTimer == 0) && (this->actor.xzDistToPlayer < 360.0f)) {
+            EnRr_SetupReach(this);
+        } else if ((this->actor.xzDistToPlayer < 1000.0f) && (this->actor.speedXZ == 0.0f)) {
+            EnRr_SetSpeed(this, 5.0f);
+        }
     }
 }
 
@@ -630,7 +709,14 @@ void EnRr_GrabPlayer(EnRr* this, GlobalContext* globalCtx) {
         Math_ApproachF(&player->actor.world.pos.x, this->mouthPos.x, 1.0f, 30.0f);
         Math_ApproachF(&player->actor.world.pos.y, this->mouthPos.y + this->swallowOffset, 1.0f, 30.0f);
         Math_ApproachF(&player->actor.world.pos.z, this->mouthPos.z, 1.0f, 30.0f);
-        Math_ApproachF(&this->swallowOffset, -55.0f, 1.0f, 5.0f);
+        if (CVar_GetS32("nLikeLikeSizeMode", 0) == 0) // OoT
+        {
+            Math_ApproachF(&this->swallowOffset, -55.0f, 1.0f, 5.0f);
+        }
+        if (CVar_GetS32("nLikeLikeSizeMode", 0) == 1) // MM
+        {
+            Math_ApproachF(&this->swallowOffset, -137.5f, 1.0f, 12.5f);
+        }
     }
 }
 
@@ -767,8 +853,29 @@ void EnRr_Update(Actor* thisx, GlobalContext* globalCtx) {
     if (this->actionTimer != 0) {
         this->actionTimer--;
     }
-    if (this->grabTimer != 0) {
-        this->grabTimer--;
+    if ((this->grabTimer != 0) && (this->hasPlayer = true)) {
+        // If Hard Mode is NOT off...
+        if (CVar_GetS32("nLikeLikeMash", 0) != 0) {
+            if (CVar_GetS32("nLikeLikeDamage", 0) != 0) {
+                Player_InflictDamage(globalCtx, -1);
+                if (this->MunchTimer == 16) {
+                    Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_DRINK);
+                    this->MunchTimer = 0;
+                }
+                this->MunchTimer++;
+            }
+            // Damage Function goes here
+        }
+        else {
+            if (CVar_GetS32("nLikeLikeDamage", 0) != 0) {
+                Player_InflictDamage(globalCtx, -1);
+                if (this->MunchTimer == 16) {
+                    Audio_PlayActorSound2(&this->actor, NA_SE_EN_LIKE_DRINK);
+                    this->MunchTimer++;
+                }
+            }
+            this->grabTimer--;
+        }
     }
     if (this->ocTimer != 0) {
         this->ocTimer--;
